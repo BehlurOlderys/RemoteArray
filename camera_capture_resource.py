@@ -21,7 +21,9 @@ class CameraCaptureResource:
             print(f"No data passed, using previous settings for capture")
 
         image_id = generator.generate()
-        self._cameras[int(camera_id)]["instance"].capture_file(image_id)
+        camera = self._cameras[int(camera_id)]["instance"]
+        camera.set_exposure_us(200000)
+        camera.capture_file(image_id)
         resp.text = json.dumps({"image_id": image_id})
         resp.status = falcon.HTTP_202
 

@@ -45,6 +45,7 @@ class ASICamera:
         return self._camera.get_control_value(asi.ASI_EXPOSURE)[0]
 
     def set_gain(self, value):
+        print(f"Will set gain as {value} DELETE ME!!!")  # TODO!
         self._camera.set_control_value(asi.ASI_GAIN, value)
 
     def get_gain(self):
