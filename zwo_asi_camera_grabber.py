@@ -19,6 +19,7 @@ image_types_by_value = {v: k for k, v in image_types_by_name.items()}
 class ASICamera:
     def __init__(self, camera_index):
         self._camera = asi.Camera(camera_index)
+        self._index = camera_index
 
     @staticmethod
     def get_cameras_list():
@@ -34,6 +35,15 @@ class ASICamera:
         if not asi_initialized:
             asi.init(asi_lib_path)
             asi_initialized = True
+
+    def connect(self):
+        asi._open_camera(self._index)
+
+    def disconnect(self):
+        asi._close_camera(self._index)
+
+    def get_property(self):
+        return self._camera.get_camera_property()
 
     def get_controls(self):
         return self._camera.get_controls()

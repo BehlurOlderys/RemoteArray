@@ -11,11 +11,28 @@ log = logging.getLogger('main')
 
 
 camera_get_settings = {
+    "connected": lambda camera: True,
+    "name": lambda camera: camera.get_property()["Name"],
+    "sensorname": lambda camera: camera.get_property()["Name"],  # TODO any other name?
+    "canasymmetricbin": lambda camera: False,
+    "pixelsizex": lambda camera: 3.75,  # TODO only for ASI120!!!
+    "pixelsizey": lambda camera: 3.75,
+    "interfaceversion": lambda camera: "1",
+    "binx": lambda camera: "1",
+    "biny": lambda camera: "1",
+    "description": lambda camera: camera.get_property()["Description"],
     "ccdtemperature": lambda camera: camera.get_camera_temperature()
 }
 
 camera_put_settings = {
-    "gain": lambda camera, value: camera.set_gain(value)
+    "gain": {
+        "method": lambda camera, value: camera.set_gain(value),
+        "argname": "Gain",
+        "argtype": int},
+    "connected": {
+        "method": lambda camera, value: camera.connect() if value else camera.disconnect(),
+        "argname": "Connected",
+        "argtype": bool}
 }
 
 
@@ -25,7 +42,9 @@ class CameraSettingsResource:
         self._server_transaction_id_generator = generator
 
     def on_get(self, req, resp, camera_id, setting_name):
+        log.debug(f"Looking for setting named {setting_name}")
         if setting_name not in camera_get_settings.keys():
+            log.debug(f"Setting >>{setting_name}<< not found, available keys are: {str(camera_get_settings.keys())}")
             resp.status = falcon.HTTP_404
             return
         if not check_camera_id(camera_id, self._cameras, resp):
@@ -52,6 +71,7 @@ class CameraSettingsResource:
         resp.status = falcon.HTTP_200
 
     def on_put(self, req, resp, camera_id, setting_name):
+        log.debug(f"Looking for setting named {setting_name}")
         if setting_name not in camera_put_settings.keys():
             resp.status = falcon.HTTP_404
             return
@@ -61,7 +81,11 @@ class CameraSettingsResource:
         form = req.media
 
         camera = self._cameras[int(camera_id)]["instance"]
-        camera_put_settings[setting_name](camera, int(form["Gain"]))
+        method = camera_put_settings[setting_name]["method"]
+        argname = camera_put_settings[setting_name]["argname"]
+        argtype = camera_put_settings[setting_name]["argtype"]
+
+        method(camera, argtype(form[argname]))
         # TODO: an error can happen above!
 
         client_id, client_transaction_id = get_optional_query_params_for_ascom(req, "PUT")

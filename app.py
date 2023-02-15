@@ -61,12 +61,12 @@ app = application = falcon.App()
 
 server_transaction_id_generator = DefaultServerTransactionIDGenerator()
 
-app.add_route("/status", StatusResource())
-app.add_route("/cameras/list", CamerasListResource(cameras_dict))
-app.add_route("/camera/{camera_id}/connected", CameraConnectedResource(cameras_dict))
-app.add_route("/camera/{camera_id}/capture", CameraCaptureResource(cameras_dict))
-app.add_route("/camera/{camera_id}/images/status/{image_name}", DummyResource()) #ImageStatusResource(cameras_dict))
-app.add_route("/camera/{camera_id}/images/download/{image_name}", ImageDownloadResource(cameras_dict))
-app.add_route("/camera/{camera_id}/{setting_name}", CameraSettingsResource(cameras_dict, server_transaction_id_generator))
+app.add_route("/api/v1/status", StatusResource())
+app.add_route("/api/v1/cameras/list", CamerasListResource(cameras_dict))
+# app.add_route("/api/v1/camera/{camera_id}/connected", CameraConnectedResource(cameras_dict))
+app.add_route("/api/v1/camera/{camera_id}/capture", CameraCaptureResource(cameras_dict))
+app.add_route("/api/v1/camera/{camera_id}/images/status/{image_name}", DummyResource()) #ImageStatusResource(cameras_dict))
+app.add_route("/api/v1/camera/{camera_id}/images/download/{image_name}", ImageDownloadResource(cameras_dict))
+app.add_route("/api/v1/camera/{camera_id}/{setting_name}", CameraSettingsResource(cameras_dict, server_transaction_id_generator))
 
 

@@ -20,6 +20,7 @@ def get_optional_query_params_for_ascom(req: falcon.Request, method: str):
 def check_camera_id(camera_id, cameras, resp):
     try:
         if int(camera_id) not in cameras.keys():
+            resp.text = json.dumps({"error": f"camera with id {camera_id} not found"})
             resp.status = falcon.HTTP_404
             return False
         else:
