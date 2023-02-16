@@ -3,8 +3,7 @@ import logging
 from .status_resource import StatusResource
 from .camera_settings_resource import CameraSettingsResource
 from .cameras_list_resource import CamerasListResource
-from .camera_connected_resource import CameraConnectedResource
-from .zwo_asi_camera_grabber import ASICamera
+from .zwo_camera import ZwoCamera
 from .camera_capture_resource import CameraCaptureResource
 from .image_download_resource import ImageDownloadResource
 
@@ -47,23 +46,28 @@ mainHandler.setFormatter(formatter)
 log.addHandler(mainHandler)
 
 
-ASICamera.initialize_library()
-cameras = ASICamera.get_cameras_list()
+ZwoCamera.initialize_library()
+cameras = ZwoCamera.get_cameras_list()
 cameras_dict = dict(zip(range(0, len(cameras)), cameras))
 cameras_dict = {i: {"name": n,
                     "id": i,
-                    "instance": ASICamera(i),
+                    "instance": ZwoCamera(i),
                     "image_path": "",
                     "generator": DefaultCaptureFilenameGenerator(f"camera_{i}")} for i, n in cameras_dict.items()}
 
 app = application = falcon.App()
 
 
+for k,v in cameras_dict.items():
+    inst = v["instance"]
+    log.debug(inst.get_property())
+    for kk, vv in inst.get_controls().items():
+        log.debug(vv)
+
 server_transaction_id_generator = DefaultServerTransactionIDGenerator()
 
 app.add_route("/api/v1/status", StatusResource())
 app.add_route("/api/v1/cameras/list", CamerasListResource(cameras_dict))
-# app.add_route("/api/v1/camera/{camera_id}/connected", CameraConnectedResource(cameras_dict))
 app.add_route("/api/v1/camera/{camera_id}/capture", CameraCaptureResource(cameras_dict))
 app.add_route("/api/v1/camera/{camera_id}/images/status/{image_name}", DummyResource()) #ImageStatusResource(cameras_dict))
 app.add_route("/api/v1/camera/{camera_id}/images/download/{image_name}", ImageDownloadResource(cameras_dict))

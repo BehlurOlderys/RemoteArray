@@ -1,9 +1,7 @@
 import falcon.status_codes
-from .zwo_asi_camera_grabber import ASICamera
 from .camera_server_utils import get_optional_query_params_for_ascom
 from .camera_server_utils import check_camera_id
 import json
-import os
 import logging
 
 
@@ -11,28 +9,66 @@ log = logging.getLogger('main')
 
 
 camera_get_settings = {
-    "connected": lambda camera: True,
-    "name": lambda camera: camera.get_property()["Name"],
-    "sensorname": lambda camera: camera.get_property()["Name"],  # TODO any other name?
-    "canasymmetricbin": lambda camera: False,
-    "pixelsizex": lambda camera: 3.75,  # TODO only for ASI120!!!
-    "pixelsizey": lambda camera: 3.75,
-    "interfaceversion": lambda camera: "1",
-    "binx": lambda camera: "1",
-    "biny": lambda camera: "1",
-    "description": lambda camera: camera.get_property()["Description"],
-    "ccdtemperature": lambda camera: camera.get_camera_temperature()
+    "connected": lambda camera: camera.get_connected(),
+    "name": lambda camera: camera.get_name(),
+    "sensorname": lambda camera: camera.get_sensorname(),
+    "canasymmetricbin": lambda camera: camera.get_canasymmetricbin(),
+    "pixelsizex": lambda camera: camera.get_pixelsizex(),
+    "pixelsizey": lambda camera: camera.get_pixelsizey(),
+    "interfaceversion": lambda camera: camera.get_interfaceversion(),
+    "binx": lambda camera: camera.get_binx(),
+    "biny": lambda camera: camera.get_biny(),
+    "cameraxsize": lambda camera: camera.get_cameraxsize(),
+    "cameraysize": lambda camera: camera.get_cameraysize(),
+    "description": lambda camera: camera.get_description(),
+    "ccdtemperature": lambda camera: camera.get_ccdtemperature(),
+    "maxbinx": lambda camera: camera.get_maxbinx(),
+    "maxbiny": lambda camera: camera.get_maxbiny(),
+    "sensortype": lambda camera: camera.get_sensortype(),
+    "maxadu": lambda camera: camera.get_maxadu(),
+    "exposuremin": lambda camera: camera.get_exposuremin(),
+    "startx": lambda camera: camera.get_startx(),
+    "starty": lambda camera: camera.get_starty(),
+    "cansetccdtemperature": lambda camera: camera.get_cansetccdtemperature(),
+    "cangetcoolerpower": lambda camera: camera.get_cangetcoolerpower(),
+    "numx": lambda camera: camera.get_numx(),
+    "numy": lambda camera: camera.get_numy(),
 }
 
 camera_put_settings = {
     "gain": {
         "method": lambda camera, value: camera.set_gain(value),
         "argname": "Gain",
-        "argtype": int},
+        "argtype": int
+    },
     "connected": {
-        "method": lambda camera, value: camera.connect() if value else camera.disconnect(),
+        "method": lambda camera, value: camera.set_connected(value),
         "argname": "Connected",
-        "argtype": bool}
+        "argtype": bool
+    },
+    "numx": {
+        "method": lambda camera, value: camera.set_numx(value),
+        "argname": "NumX",
+        "argtype": int
+    },
+    "numy": {
+        "method": lambda camera, value: camera.set_numy(value),
+        "argname": "NumY",
+        "argtype": int
+    },
+    "startx": {
+        "method": lambda camera, value: camera.set_startx(value),
+        "argname": "StartX",
+        "argtype": int
+    },
+    "starty": {
+        "method": lambda camera, value: camera.set_starty(value),
+        "argname": "StartY",
+        "argtype": int
+    },
+    "startexposure": {
+        # TODO!!!!
+    }
 }
 
 
@@ -42,16 +78,17 @@ class CameraSettingsResource:
         self._server_transaction_id_generator = generator
 
     def on_get(self, req, resp, camera_id, setting_name):
-        log.debug(f"Looking for setting named {setting_name}")
+        log.debug(f"GET: Looking for setting named {setting_name}")
         if setting_name not in camera_get_settings.keys():
-            log.debug(f"Setting >>{setting_name}<< not found, available keys are: {str(camera_get_settings.keys())}")
+            log.error(f"Setting >>{setting_name}<< not found, available keys are: {str(camera_get_settings.keys())}")
             resp.status = falcon.HTTP_404
             return
         if not check_camera_id(camera_id, self._cameras, resp):
             return
 
         camera = self._cameras[int(camera_id)]["instance"]
-        value = (camera_get_settings[setting_name])(camera)
+        value = camera_get_settings[setting_name](camera)
+        log.debug(f"Will try to respond with value={value}")
         # TODO: an error can happen above!
 
         client_id, client_transaction_id = get_optional_query_params_for_ascom(req, "GET")
@@ -71,8 +108,9 @@ class CameraSettingsResource:
         resp.status = falcon.HTTP_200
 
     def on_put(self, req, resp, camera_id, setting_name):
-        log.debug(f"Looking for setting named {setting_name}")
+        log.debug(f"PUT: Looking for setting named {setting_name}")
         if setting_name not in camera_put_settings.keys():
+            log.error(f"Setting >>{setting_name}<< not found, available keys are: {str(camera_get_settings.keys())}")
             resp.status = falcon.HTTP_404
             return
         if not check_camera_id(camera_id, self._cameras, resp):
@@ -85,7 +123,14 @@ class CameraSettingsResource:
         argname = camera_put_settings[setting_name]["argname"]
         argtype = camera_put_settings[setting_name]["argtype"]
 
-        method(camera, argtype(form[argname]))
+        try:
+            method(camera, argtype(form[argname]))
+        except Exception as e:
+            log.error(e)
+            resp.text = str(e)
+            resp.status = falcon.HTTP_400
+            return
+
         # TODO: an error can happen above!
 
         client_id, client_transaction_id = get_optional_query_params_for_ascom(req, "PUT")

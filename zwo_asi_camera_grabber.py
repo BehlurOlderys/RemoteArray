@@ -77,6 +77,12 @@ class ASICamera:
         print(f"high speed mode = {r}")
         return r
 
+    def get_properties(self):
+        return self._camera.get_camera_property()
+
+    def get_bin(self):
+        return self._camera.get_bin()
+
     def get_supported_image_types(self):
         camera_info = self._camera.get_camera_property()
         supported = camera_info['SupportedVideoFormat']

@@ -1,6 +1,5 @@
 import falcon
 import json
-from .zwo_asi_camera_grabber import ASICamera
 
 
 class CamerasListResource:
