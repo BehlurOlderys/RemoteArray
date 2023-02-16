@@ -1,5 +1,15 @@
 from .ascom_device import AscomDevice
 from abc import abstractmethod
+from enum import Enum
+
+
+class CameraState(Enum):
+    IDLE = 0
+    WAITING = 1
+    EXPOSING = 2
+    READING = 3
+    DOWNLOAD = 4
+    ERROR = 5
 
 
 class AscomCamera(AscomDevice):
@@ -35,7 +45,15 @@ class AscomCamera(AscomDevice):
     def get_camerastate(self):
         """
         Returns the camera operational state.
+        Returns the current camera operational state as an integer.
+        0 = CameraIdle ,
+        1 = CameraWaiting ,
+        2 = CameraExposing ,
+        3 = CameraReading ,
+        4 = CameraDownload ,
+        5 = CameraError
         """
+        pass
 
     @abstractmethod
     def get_cameraxsize(self):
@@ -391,26 +409,52 @@ class AscomCamera(AscomDevice):
         """
         pass
 
+    @abstractmethod
     def set_numx(self, value):
         """
         Sets the current subframe width.
         """
         pass
 
+    @abstractmethod
     def set_numy(self, value):
         """
         Sets the current subframe height.
         """
         pass
 
+    @abstractmethod
     def set_startx(self, value):
         """
         Sets the current subframe X axis start position in binned pixels.
         """
         pass
 
+    @abstractmethod
     def set_starty(self, value):
         """
-        Sets the current subframe Y axis start position in binned pixels.ight.
+        Sets the current subframe Y axis start position in binned pixels.
+        """
+        pass
+
+    @abstractmethod
+    def abortexposure(self):
+        """
+        Aborts the current exposure, if any, and returns the camera to Idle state.
+        """
+        pass
+
+    @abstractmethod
+    def startexposure(self, duration: float, light=True):
+        """
+        Starts an exposure. Use ImageReady to check when the exposure is complete.
+        """
+        pass
+
+    @abstractmethod
+    def stoptexposure(self):
+        """
+        Stops the current exposure, if any. If an exposure is in progress, the readout process is initiated.
+        Ignored if readout is already in process.
         """
         pass

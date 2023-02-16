@@ -27,47 +27,54 @@ camera_get_settings = {
     "sensortype": lambda camera: camera.get_sensortype(),
     "maxadu": lambda camera: camera.get_maxadu(),
     "exposuremin": lambda camera: camera.get_exposuremin(),
+    "exposuremax": lambda camera: camera.get_exposuremax(),
     "startx": lambda camera: camera.get_startx(),
     "starty": lambda camera: camera.get_starty(),
     "cansetccdtemperature": lambda camera: camera.get_cansetccdtemperature(),
     "cangetcoolerpower": lambda camera: camera.get_cangetcoolerpower(),
     "numx": lambda camera: camera.get_numx(),
     "numy": lambda camera: camera.get_numy(),
+    "imageready": lambda camera: camera.get_imageready(),
+    "camerastate": lambda camera: int(camera.get_camerastate()),
+    "cooleron": lambda camera: camera.get_cooleron(),
+    "bayeroffsetx": lambda camera: camera.get_bayeroffsetx(),
+    "bayeroffsety": lambda camera: camera.get_bayeroffsety(),
+    "canstopexposure": lambda camera: camera.get_canstopexposure(),
+    "imagearray": lambda camera: camera.get_imagearray(),
+    "gainmin": lambda camera: camera.get_gainmin(),
+    "gainmax": lambda camera: camera.get_gainmax(),
 }
 
 camera_put_settings = {
     "gain": {
-        "method": lambda camera, value: camera.set_gain(value),
-        "argname": "Gain",
-        "argtype": int
+        "method": lambda camera, args: camera.set_gain(int(args["Gain"])),
     },
     "connected": {
-        "method": lambda camera, value: camera.set_connected(value),
-        "argname": "Connected",
-        "argtype": bool
+        "method": lambda camera, args: camera.set_connected(bool(args["Connected"])),
     },
     "numx": {
-        "method": lambda camera, value: camera.set_numx(value),
-        "argname": "NumX",
-        "argtype": int
+        "method": lambda camera, args: camera.set_numx(int(args["NumX"])),
     },
     "numy": {
-        "method": lambda camera, value: camera.set_numy(value),
-        "argname": "NumY",
-        "argtype": int
+        "method": lambda camera, args: camera.set_numy(int(args["NumY"])),
     },
     "startx": {
-        "method": lambda camera, value: camera.set_startx(value),
-        "argname": "StartX",
-        "argtype": int
+        "method": lambda camera, args: camera.set_startx(int(args["StartX"])),
     },
     "starty": {
-        "method": lambda camera, value: camera.set_starty(value),
-        "argname": "StartY",
-        "argtype": int
+        "method": lambda camera, args: camera.set_starty(int(args["StartY"])),
     },
     "startexposure": {
-        # TODO!!!!
+        "method": lambda camera, args: camera.startexposure(
+            float(args["Duration"]),
+            bool(args["Light"])
+        ),
+    },
+    "stopexposure": {
+        "method": lambda camera, args: camera.stopexposure(),
+    },
+    "abortexposure": {
+        "method": lambda camera, args: camera.abortexposure(),
     }
 }
 
@@ -77,7 +84,7 @@ class CameraSettingsResource:
         self._cameras = cameras
         self._server_transaction_id_generator = generator
 
-    def on_get(self, req, resp, camera_id, setting_name):
+    def on_get(self, req : falcon.Request, resp: falcon.Response, camera_id, setting_name):
         log.debug(f"GET: Looking for setting named {setting_name}")
         if setting_name not in camera_get_settings.keys():
             log.error(f"Setting >>{setting_name}<< not found, available keys are: {str(camera_get_settings.keys())}")
@@ -88,8 +95,15 @@ class CameraSettingsResource:
 
         camera = self._cameras[int(camera_id)]["instance"]
         value = camera_get_settings[setting_name](camera)
-        log.debug(f"Will try to respond with value={value}")
         # TODO: an error can happen above!
+
+        if setting_name == "imagearray":
+            print(req.headers)
+        else:
+            log.debug(f"Will try to respond with value={value}")
+
+
+
 
         client_id, client_transaction_id = get_optional_query_params_for_ascom(req, "GET")
         log.debug(f"ClientID of request = {client_id}")
@@ -120,11 +134,9 @@ class CameraSettingsResource:
 
         camera = self._cameras[int(camera_id)]["instance"]
         method = camera_put_settings[setting_name]["method"]
-        argname = camera_put_settings[setting_name]["argname"]
-        argtype = camera_put_settings[setting_name]["argtype"]
 
         try:
-            method(camera, argtype(form[argname]))
+            method(camera, form)
         except Exception as e:
             log.error(e)
             resp.text = str(e)

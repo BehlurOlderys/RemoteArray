@@ -1,7 +1,7 @@
 import falcon
 import logging
 from .status_resource import StatusResource
-from .camera_settings_resource import CameraSettingsResource
+from .camera_resource import CameraResource
 from .cameras_list_resource import CamerasListResource
 from .zwo_camera import ZwoCamera
 from .camera_capture_resource import CameraCaptureResource
@@ -71,6 +71,6 @@ app.add_route("/api/v1/cameras/list", CamerasListResource(cameras_dict))
 app.add_route("/api/v1/camera/{camera_id}/capture", CameraCaptureResource(cameras_dict))
 app.add_route("/api/v1/camera/{camera_id}/images/status/{image_name}", DummyResource()) #ImageStatusResource(cameras_dict))
 app.add_route("/api/v1/camera/{camera_id}/images/download/{image_name}", ImageDownloadResource(cameras_dict))
-app.add_route("/api/v1/camera/{camera_id}/{setting_name}", CameraSettingsResource(cameras_dict, server_transaction_id_generator))
+app.add_route("/api/v1/camera/{camera_id}/{setting_name}", CameraResource(cameras_dict, server_transaction_id_generator))
 
 
