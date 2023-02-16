@@ -172,7 +172,7 @@ class ZwoCamera(AscomCamera):
         pass  # TODO!
 
     def get_gain(self):
-        pass  # TODO!
+        return self._camera.get_control_value(asi.ASI_GAIN)
 
     def get_gainmax(self):
         return self._camera.get_controls()["Gain"]["MaxValue"]
@@ -191,20 +191,15 @@ class ZwoCamera(AscomCamera):
 
     def get_imagearray(self):
         filename = None  # TODO this can be somehow customized
-        data = self.get_data_after_exposure(None)
-        whbi = self.get_roi_format()
-
-        ASI_IMG_RAW8 = 0
-        ASI_IMG_RGB24 = 1
-        ASI_IMG_RAW16 = 2
-        ASI_IMG_Y8 = 3
+        data = self._camera.get_data_after_exposure(None)
+        whbi = self._camera.get_roi_format()
 
         shape = [whbi[1], whbi[0]]
-        if whbi[3] == ASI_IMG_RAW8 or whbi[3] == ASI_IMG_Y8:
+        if whbi[3] == asi.ASI_IMG_RAW8 or whbi[3] == asi.ASI_IMG_Y8:
             img = np.frombuffer(data, dtype=np.uint8)
-        elif whbi[3] == ASI_IMG_RAW16:
+        elif whbi[3] == asi.ASI_IMG_RAW16:
             img = np.frombuffer(data, dtype=np.uint16)
-        elif whbi[3] == ASI_IMG_RGB24:
+        elif whbi[3] == asi.ASI_IMG_RGB24:
             img = np.frombuffer(data, dtype=np.uint8)
             shape.append(3)
         else:
@@ -222,8 +217,6 @@ class ZwoCamera(AscomCamera):
         #     image.save(filename)
         #     logger.debug('wrote %s', filename)
         return img
-
-        pass  # TODO!
 
     def get_imagearrayvariant(self):
         pass  # TODO!

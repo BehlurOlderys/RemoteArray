@@ -41,8 +41,10 @@ camera_get_settings = {
     "bayeroffsety": lambda camera: camera.get_bayeroffsety(),
     "canstopexposure": lambda camera: camera.get_canstopexposure(),
     "imagearray": lambda camera: camera.get_imagearray(),
+    "gain": lambda camera: camera.get_gain(),
     "gainmin": lambda camera: camera.get_gainmin(),
     "gainmax": lambda camera: camera.get_gainmax(),
+    "canabortexposure": lambda camera: camera.get_canabortexposure()
 }
 
 camera_put_settings = {
@@ -94,16 +96,17 @@ class CameraResource:
             return
 
         camera = self._cameras[int(camera_id)]["instance"]
-        value = camera_get_settings[setting_name](camera)
         # TODO: an error can happen above!
+        value = 0
 
         if setting_name == "imagearray":
+            img = camera_get_settings[setting_name](camera)
             print(req.headers)
+            log.info(req.headers)
+            resp.set_header("base64handoff", "true")
         else:
+            value = camera_get_settings[setting_name](camera)
             log.debug(f"Will try to respond with value={value}")
-
-
-
 
         client_id, client_transaction_id = get_optional_query_params_for_ascom(req, "GET")
         log.debug(f"ClientID of request = {client_id}")

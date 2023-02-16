@@ -1,9 +1,9 @@
 from .ascom_device import AscomDevice
 from abc import abstractmethod
-from enum import Enum
+from enum import IntEnum
 
 
-class CameraState(Enum):
+class CameraState(IntEnum):
     IDLE = 0
     WAITING = 1
     EXPOSING = 2
