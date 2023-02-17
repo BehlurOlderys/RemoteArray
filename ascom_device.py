@@ -37,6 +37,25 @@ class AscomDevice(ABC):
         """
         pass
 
+    @abstractmethod
+    def get_driverinfo(self):
+        """
+        The description of the driver
+        """
+        pass
+
+    def get_driverversion(self):
+        """
+        A string containing only the major and minor version of the driver.
+        """
+        pass
+
+    def get_supportedactions(self):
+        """
+        Returns the list of action names supported by this driver.
+        """
+        pass
+
     # SETTERS
     @abstractmethod
     def set_connected(self, value):

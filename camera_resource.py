@@ -12,7 +12,18 @@ camera_get_settings = {
     "connected": lambda camera: camera.get_connected(),
     "name": lambda camera: camera.get_name(),
     "sensorname": lambda camera: camera.get_sensorname(),
+    "driverinfo": lambda camera: camera.get_driverinfo(),
+    "driverversion": lambda camera: camera.get_driverversion(),
+    "supportedactions": lambda camera: camera.get_supportedactions(),
+
+    "canpulseguide": lambda camera: camera.get_canpulseguide(),
+    "canfastreadout": lambda camera: camera.get_canfastreadout(),
     "canasymmetricbin": lambda camera: camera.get_canasymmetricbin(),
+    "cansetccdtemperature": lambda camera: camera.get_cansetccdtemperature(),
+    "cangetcoolerpower": lambda camera: camera.get_cangetcoolerpower(),
+    "canstopexposure": lambda camera: camera.get_canstopexposure(),
+    "canabortexposure": lambda camera: camera.get_canabortexposure(),
+
     "pixelsizex": lambda camera: camera.get_pixelsizex(),
     "pixelsizey": lambda camera: camera.get_pixelsizey(),
     "interfaceversion": lambda camera: camera.get_interfaceversion(),
@@ -28,10 +39,9 @@ camera_get_settings = {
     "maxadu": lambda camera: camera.get_maxadu(),
     "exposuremin": lambda camera: camera.get_exposuremin(),
     "exposuremax": lambda camera: camera.get_exposuremax(),
+    "exposureresolution": lambda camera: camera.get_exposureresolution(),
     "startx": lambda camera: camera.get_startx(),
     "starty": lambda camera: camera.get_starty(),
-    "cansetccdtemperature": lambda camera: camera.get_cansetccdtemperature(),
-    "cangetcoolerpower": lambda camera: camera.get_cangetcoolerpower(),
     "numx": lambda camera: camera.get_numx(),
     "numy": lambda camera: camera.get_numy(),
     "imageready": lambda camera: camera.get_imageready(),
@@ -39,12 +49,12 @@ camera_get_settings = {
     "cooleron": lambda camera: camera.get_cooleron(),
     "bayeroffsetx": lambda camera: camera.get_bayeroffsetx(),
     "bayeroffsety": lambda camera: camera.get_bayeroffsety(),
-    "canstopexposure": lambda camera: camera.get_canstopexposure(),
     "imagearray": lambda camera: camera.get_imagearray(),
+    "imagearraybase64": lambda camera: camera.get_imagearraybase64(),
     "gain": lambda camera: camera.get_gain(),
     "gainmin": lambda camera: camera.get_gainmin(),
     "gainmax": lambda camera: camera.get_gainmax(),
-    "canabortexposure": lambda camera: camera.get_canabortexposure()
+    "heatsinktemperature": lambda camera: camera.get_heatsinktemperature(),
 }
 
 camera_put_settings = {
@@ -59,6 +69,12 @@ camera_put_settings = {
     },
     "numy": {
         "method": lambda camera, args: camera.set_numy(int(args["NumY"])),
+    },
+    "binx": {
+        "method": lambda camera, args: camera.set_binx(int(args["BinX"])),
+    },
+    "biny": {
+        "method": lambda camera, args: camera.set_biny(int(args["BinY"])),
     },
     "startx": {
         "method": lambda camera, args: camera.set_startx(int(args["StartX"])),
@@ -101,9 +117,47 @@ class CameraResource:
 
         if setting_name == "imagearray":
             img = camera_get_settings[setting_name](camera)
-            print(req.headers)
             log.info(req.headers)
-            resp.set_header("base64handoff", "true")
+
+            # base64_bytes = base64.b64encode(img)
+            # base64_message = base64_bytes.decode('ascii')
+
+            rank, dim0, dim1, dim2 = camera.get_image_specs()
+            log.info(f"Image shape = {img.shape}, rank={rank}, dim0={dim0}, dim1={dim1}")
+            try:
+                client_id, client_transaction_id = get_optional_query_params_for_ascom(req, "GET")
+            except Exception:
+                resp.status = falcon.HTTP_400
+                return
+
+            if client_id < 0 or client_transaction_id < 0:
+                resp.status = falcon.HTTP_400
+                return
+
+            log.debug(f"ClientID of request = {client_id}")
+            server_transaction_id = self._server_transaction_id_generator.generate()
+            log.debug(f"Responding with id = {server_transaction_id}")
+            error_number = 0  # TODO!
+            error_message = ""  # TODO!
+            list_image = img.tolist()
+
+            resp.text = json.dumps({
+                "Type": 2,
+                "Rank": rank,
+                # "Dimension0Length": dim0,
+                # "Dimension1Length": dim1,
+                # "Dimension2Length": dim2,
+                "ClientTransactionID": client_transaction_id,
+                "ServerTransactionID": server_transaction_id,
+                "ErrorNumber": error_number,
+                "ErrorMessage": error_message,
+                "Value": list_image
+            })
+            # log.debug(f"returned JSON: {resp.text}")
+
+            # resp.set_header("base64handoff", "true")
+            resp.status = falcon.HTTP_200
+            return
         else:
             value = camera_get_settings[setting_name](camera)
             log.debug(f"Will try to respond with value={value}")
@@ -134,6 +188,7 @@ class CameraResource:
             return
 
         form = req.media
+        log.info(f"Send form = {form}")
 
         camera = self._cameras[int(camera_id)]["instance"]
         method = camera_put_settings[setting_name]["method"]

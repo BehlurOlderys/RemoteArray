@@ -6,7 +6,7 @@ from .cameras_list_resource import CamerasListResource
 from .zwo_camera import ZwoCamera
 from .camera_capture_resource import CameraCaptureResource
 from .image_download_resource import ImageDownloadResource
-
+import numpy as np
 from datetime import datetime
 
 
@@ -54,6 +54,10 @@ cameras_dict = {i: {"name": n,
                     "instance": ZwoCamera(i),
                     "image_path": "",
                     "generator": DefaultCaptureFilenameGenerator(f"camera_{i}")} for i, n in cameras_dict.items()}
+
+# ar = np.zeros((5, 7))
+# print(f"Ar shape = {ar.shape}")
+# print(ar.tolist())
 
 app = application = falcon.App()
 

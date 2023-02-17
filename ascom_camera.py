@@ -410,6 +410,20 @@ class AscomCamera(AscomDevice):
         pass
 
     @abstractmethod
+    def set_binx(self, value):
+        """
+        Sets the binning factor for the X axis.
+        """
+        pass
+
+    @abstractmethod
+    def set_biny(self, value):
+        """
+        Sets the binning factor for the Y axis.
+        """
+        pass
+
+    @abstractmethod
     def set_numx(self, value):
         """
         Sets the current subframe width.

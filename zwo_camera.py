@@ -2,6 +2,7 @@ from .ascom_camera import AscomCamera, CameraState
 import zwoasi as asi
 import logging
 import numpy as np
+import base64
 
 
 log = logging.getLogger('main')
@@ -12,7 +13,7 @@ asi_initialized = False
 
 ONE_SECOND_IN_MILLISECONDS = 1000
 ONE_MILLISECOND_IN_MICROSECONDS = 1000
-ONE_SECOND_IN_MICROSECODS = ONE_SECOND_IN_MILLISECONDS*ONE_MILLISECOND_IN_MICROSECONDS
+ONE_SECOND_IN_MICROSECONDS = ONE_SECOND_IN_MILLISECONDS * ONE_MILLISECOND_IN_MICROSECONDS
 
 
 class ZwoCamera(AscomCamera):
@@ -20,11 +21,28 @@ class ZwoCamera(AscomCamera):
         self._state = CameraState.IDLE
         self._camera = asi.Camera(camera_index)
         self._index = camera_index
-        self._camera.set_control_value(asi.ASI_GAIN, 0)
-        self._camera.set_control_value(asi.ASI_EXPOSURE, ONE_SECOND_IN_MICROSECODS)
+        self._camera.set_control_value(asi.ASI_GAIN, 17)
+        self._camera.set_control_value(asi.ASI_EXPOSURE, 5 * ONE_SECOND_IN_MICROSECONDS)
+        self._camera.set_image_type(asi.ASI_IMG_RAW16)
         self._connected = True
 
         log.info(f"ROI FORMAT = {self._camera.get_roi_format()}")
+
+    def get_image_specs(self):
+        """
+        :return: tuple with elements:
+        rank, dim0, dim1, dim2
+        """
+        whbi = self._camera.get_roi_format()
+        im_type = whbi[3]
+        if im_type in [asi.ASI_IMG_RAW8, asi.ASI_IMG_Y8, asi.ASI_IMG_RAW16]:
+            rank = 2
+        elif im_type == asi.ASI_IMG_RGB24:
+            rank = 3
+        else:
+            return -1
+        dim3 = 0 if rank == 2 else 3
+        return rank, whbi[0], whbi[1], dim3
 
     def get_property(self):
         return self._camera.get_camera_property()
@@ -63,13 +81,29 @@ class ZwoCamera(AscomCamera):
         return self._camera.get_camera_property()["Name"]
 
     def get_description(self):
-        return self._camera.get_camera_property()["Description"]
+        if "Description" in self._camera.get_camera_property():
+            return self._camera.get_camera_property()["Description"]
+        return "<no description available>"
+
+    def get_driverinfo(self):
+        return "This is ALPACA driver by Bartlomiej Hnatio"
+
+    def get_driverversion(self):
+        return "v1.0"
 
     def get_interfaceversion(self):
-        print("ZWO CAMERA method")
-        return "1"
+        return 1
+
+    def get_supportedactions(self):
+        return []
 
     # Camera specific methods - as required by Sharpcap (for now) # TODO!
+
+    def get_canpulseguide(self):
+        return False  # TODO as for now
+
+    def get_canfastreadout(self):
+        return "HighSpeedMode" in self._camera.get_controls()
 
     def get_sensorname(self):
         return self._camera.get_camera_property()["Name"]
@@ -109,6 +143,8 @@ class ZwoCamera(AscomCamera):
 
     def get_camerastate(self):
         exp_status = self._camera.get_exposure_status()
+        if exp_status == 2:
+            return CameraState.IDLE
         if exp_status == 3:
             return CameraState.ERROR
         if exp_status == 0:
@@ -132,14 +168,8 @@ class ZwoCamera(AscomCamera):
     def get_canabortexposure(self):
         return False  # TODO - maybe?
 
-    def get_canfastreadout(self):
-        return "HighSpeedMode" in self._camera.get_controls()
-
     def get_cangetcoolerpower(self):
         return False
-
-    def get_canpulseguide(self):
-        pass  # TODO!
 
     def get_cansetccdtemperature(self):
         return self._camera.get_camera_property()["IsCoolerCam"]
@@ -157,13 +187,13 @@ class ZwoCamera(AscomCamera):
         pass  # TODO!
 
     def get_exposuremax(self):
-        return self._camera.get_controls()["Exposure"]["MaxValue"]
+        return self._camera.get_controls()["Exposure"]["MaxValue"] / ONE_SECOND_IN_MICROSECONDS
 
     def get_exposuremin(self):
-        return self._camera.get_controls()["Exposure"]["MinValue"]
+        return self._camera.get_controls()["Exposure"]["MinValue"] / ONE_SECOND_IN_MICROSECONDS
 
     def get_exposureresolution(self):
-        pass  # TODO!
+        return 1.0 / ONE_SECOND_IN_MICROSECONDS
 
     def get_fastreadout(self):
         return self._camera.get_controls().get("HighSpeedMode", 0)
@@ -187,7 +217,7 @@ class ZwoCamera(AscomCamera):
         pass  # TODO!
 
     def get_heatsinktemperature(self):
-        pass  # TODO!
+        return 0  # TODO!!!
 
     def get_imagearray(self):
         filename = None  # TODO this can be somehow customized
@@ -205,6 +235,7 @@ class ZwoCamera(AscomCamera):
         else:
             raise ValueError('Unsupported image type')
         img = img.reshape(shape)
+        # img = np.transpose(img, (1, 0, 2))
 
         # if filename is not None:
         #     from PIL import Image
@@ -217,6 +248,11 @@ class ZwoCamera(AscomCamera):
         #     image.save(filename)
         #     logger.debug('wrote %s', filename)
         return img
+
+    def get_imagearraybase64(self):
+        img = self.get_imagearray()
+        base64_bytes = base64.b64encode(img)
+        return base64_bytes.decode('ascii')
 
     def get_imagearrayvariant(self):
         pass  # TODO!
@@ -270,9 +306,10 @@ class ZwoCamera(AscomCamera):
         pass  # TODO!
 
     def get_sensortype(self):
-        if not self._camera.get_camera_property()["IsColorCam"]:
-            return 0
-        return self._camera.get_camera_property()["BayerPattern"]
+        # if not self._camera.get_camera_property()["IsColorCam"]:
+        #     return 0
+        # return self._camera.get_camera_property()["BayerPattern"]
+        return 2  # TODO!!!! it should be variable, this is good only for ASI120MC
 
     def get_setccdtemperature(self):
         pass  # TODO!
@@ -282,6 +319,25 @@ class ZwoCamera(AscomCamera):
 
     def get_starty(self):
         return self._camera.get_roi()[1]
+
+    def _set_bins(self, value):
+        whbi = self._camera.get_roi_format()
+        new_bins = int(value)
+        if new_bins < 0 or new_bins > max(self._camera.get_camera_property()["SupportedBins"]):
+            raise Exception
+
+        old_bins = whbi[2]
+        whbi[0] = int(whbi[0]*old_bins/new_bins)
+        whbi[1] = int(whbi[1]*old_bins/new_bins)
+        whbi[2] = new_bins
+
+        self._camera.set_roi_format(*whbi)
+
+    def set_binx(self, value):
+        self._set_bins(value)
+
+    def set_biny(self, value):
+        self._set_bins(value)
 
     def set_numx(self, value):
         sx, sy, _, h = self._camera.get_roi()
@@ -306,4 +362,6 @@ class ZwoCamera(AscomCamera):
         self._camera.stop_exposure()
 
     def startexposure(self, duration: float, light=True):
+        log.info(f"Starting exposure: {duration}s")
+        self._camera.set_control_value(asi.ASI_EXPOSURE, int(duration * ONE_SECOND_IN_MICROSECONDS))
         self._camera.start_exposure(is_dark=not light)

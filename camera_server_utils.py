@@ -3,18 +3,16 @@ import json
 
 
 def get_optional_query_params_for_ascom(req: falcon.Request, method: str):
-    client_id = 42
-    client_transaction_id = 42
 
     if method == "GET":
-        client_id = req.params.get("ClientID", 0)
-        client_transaction_id = req.params.get("ClientTransactionID", 0)
+        client_id = req.params.get("ClientID")
+        client_transaction_id = req.params.get("ClientTransactionID")
 
     if method == "PUT":
-        client_id = req.media.get("ClientID", 0)
-        client_transaction_id = req.media.get("ClientTransactionID", 0)
+        client_id = req.media.get("ClientID")
+        client_transaction_id = req.media.get("ClientTransactionID")
 
-    return client_id, client_transaction_id
+    return int(client_id), int(client_transaction_id)
 
 
 def check_camera_id(camera_id, cameras, resp):
