@@ -459,9 +459,10 @@ class AscomCamera(AscomDevice):
         pass
 
     @abstractmethod
-    def startexposure(self, duration: float, light=True):
+    def startexposure(self, duration: float, light=True, save=False):
         """
         Starts an exposure. Use ImageReady to check when the exposure is complete.
+        Save is additional parameter making camera save a file
         """
         pass
 

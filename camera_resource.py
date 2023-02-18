@@ -3,6 +3,7 @@ from .camera_server_utils import get_optional_query_params_for_ascom
 from .camera_server_utils import check_camera_id
 import json
 import logging
+import os
 
 
 log = logging.getLogger('main')
@@ -55,6 +56,8 @@ camera_get_settings = {
     "gainmin": lambda camera: camera.get_gainmin(),
     "gainmax": lambda camera: camera.get_gainmax(),
     "heatsinktemperature": lambda camera: camera.get_heatsinktemperature(),
+    "imagefile": None,
+    "imagebytes": None
 }
 
 camera_put_settings = {
@@ -85,7 +88,8 @@ camera_put_settings = {
     "startexposure": {
         "method": lambda camera, args: camera.startexposure(
             float(args["Duration"]),
-            bool(args["Light"])
+            bool(args["Light"]),
+            bool(args.get("Save", False))
         ),
     },
     "stopexposure": {
@@ -104,16 +108,31 @@ class CameraResource:
 
     def on_get(self, req : falcon.Request, resp: falcon.Response, camera_id, setting_name):
         log.debug(f"GET: Looking for setting named {setting_name}")
+
+        if not check_camera_id(camera_id, self._cameras, resp):
+            return
+
         if setting_name not in camera_get_settings.keys():
             log.error(f"Setting >>{setting_name}<< not found, available keys are: {str(camera_get_settings.keys())}")
             resp.status = falcon.HTTP_404
             return
-        if not check_camera_id(camera_id, self._cameras, resp):
-            return
 
+        log.debug("Prerequisites OK")
         camera = self._cameras[int(camera_id)]["instance"]
         # TODO: an error can happen above!
-        value = 0
+
+        if setting_name == "imagebytes":
+            image_bytes, length = camera.get_imagebytes()
+            resp.content_type = "application/octet-stream"
+            resp.data = image_bytes
+            resp.content_length = length
+            return
+
+        if setting_name == "imagefile":
+            img, filename = camera.get_imagearray()
+            resp.content_type = "image/png"
+            resp.set_stream(open(filename, 'rb'), os.path.getsize(filename))
+            return
 
         if setting_name == "imagearray":
             img = camera_get_settings[setting_name](camera)
@@ -194,7 +213,7 @@ class CameraResource:
         method = camera_put_settings[setting_name]["method"]
 
         try:
-            method(camera, form)
+            result = method(camera, form)
         except Exception as e:
             log.error(e)
             resp.text = str(e)
@@ -210,10 +229,14 @@ class CameraResource:
         error_number = 0  # TODO!
         error_message = ""  # TODO!
 
-        resp.text = json.dumps({
+        response_json = {
           "ClientTransactionID": client_transaction_id,
           "ServerTransactionID": server_transaction_id,
           "ErrorNumber": error_number,
           "ErrorMessage": error_message,
-        })
+        }
+        if result is not None:
+            response_json.update(result)
+
+        resp.text = json.dumps(response_json)
         resp.status = falcon.HTTP_200

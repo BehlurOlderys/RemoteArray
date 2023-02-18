@@ -8,7 +8,7 @@ class CamerasListResource:
 
     def on_get(self, req, resp):
         try:
-            resp.text = json.dumps({"cameras": [self._cameras]})
+            resp.text = json.dumps({ "cameras": [v["name"] for k, v in self._cameras.items()]})
             resp.status = falcon.HTTP_200
         except RuntimeError as re:
             resp.text = json.dumps({"error": repr(re)})

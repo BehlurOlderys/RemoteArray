@@ -3,6 +3,7 @@ import zwoasi as asi
 import logging
 import numpy as np
 import base64
+from PIL import Image
 
 
 log = logging.getLogger('main')
@@ -21,12 +22,47 @@ class ZwoCamera(AscomCamera):
         self._state = CameraState.IDLE
         self._camera = asi.Camera(camera_index)
         self._index = camera_index
+        self._camera.set_control_value(asi.ASI_HIGH_SPEED_MODE, 1)
+        self._camera.set_control_value(asi.ASI_BANDWIDTHOVERLOAD, 60)
         self._camera.set_control_value(asi.ASI_GAIN, 17)
         self._camera.set_control_value(asi.ASI_EXPOSURE, 5 * ONE_SECOND_IN_MICROSECONDS)
-        self._camera.set_image_type(asi.ASI_IMG_RAW16)
+        self._camera.set_image_type(asi.ASI_IMG_RGB24)
         self._connected = True
+        self._new_filename = None
 
         log.info(f"ROI FORMAT = {self._camera.get_roi_format()}")
+
+        self._buffer = None
+        self._buffer_size = 0
+        self._reserve_buffer()
+
+    def _reserve_buffer(self):
+        whbi = self._camera.get_roi_format()
+        sz = whbi[0] * whbi[1]
+        if whbi[3] == asi.ASI_IMG_RGB24:
+            sz *= 3
+        elif whbi[3] == asi.ASI_IMG_RAW16:
+            sz *= 2
+
+        if self._buffer is None:
+            self._buffer_size = sz
+            self._buffer = bytearray(sz)
+            return
+
+        if sz != self._buffer_size:
+            del self._buffer
+            self._buffer_size = sz
+            self._buffer = bytearray(sz)
+
+    def _get_buffer(self):
+        return self._buffer, self._buffer_size
+
+    def _store_imagebytes(self):
+        self._camera.get_data_after_exposure(self._buffer)
+
+    def get_imagebytes(self):
+        self._store_imagebytes()
+        return self._get_buffer()
 
     def get_image_specs(self):
         """
@@ -219,9 +255,11 @@ class ZwoCamera(AscomCamera):
     def get_heatsinktemperature(self):
         return 0  # TODO!!!
 
+
     def get_imagearray(self):
-        filename = None  # TODO this can be somehow customized
+        filename = self._new_filename  # TODO this can be somehow customized
         data = self._camera.get_data_after_exposure(None)
+
         whbi = self._camera.get_roi_format()
 
         shape = [whbi[1], whbi[0]]
@@ -238,16 +276,15 @@ class ZwoCamera(AscomCamera):
         # img = np.transpose(img, (1, 0, 2))
 
         # if filename is not None:
-        #     from PIL import Image
         #     mode = None
         #     if len(img.shape) == 3:
         #         img = img[:, :, ::-1]  # Convert BGR to RGB
-        #     if whbi[3] == ASI_IMG_RAW16:
+        #     if whbi[3] == asi.ASI_IMG_RAW16:
         #         mode = 'I;16'
         #     image = Image.fromarray(img, mode=mode)
         #     image.save(filename)
-        #     logger.debug('wrote %s', filename)
-        return img
+        #     log.debug('wrote %s', filename)
+        return img, filename
 
     def get_imagearraybase64(self):
         img = self.get_imagearray()
@@ -335,25 +372,31 @@ class ZwoCamera(AscomCamera):
 
     def set_binx(self, value):
         self._set_bins(value)
+        self._reserve_buffer()
 
     def set_biny(self, value):
         self._set_bins(value)
+        self._reserve_buffer()
 
     def set_numx(self, value):
         sx, sy, _, h = self._camera.get_roi()
         self._camera.set_roi(sx, sy, value, h)
+        self._reserve_buffer()
 
     def set_numy(self, value):
         sx, sy, w, _ = self._camera.get_roi()
         self._camera.set_roi(sx, sy, w, value)
+        self._reserve_buffer()
 
     def set_startx(self, value):
         _, sy, w, h = self._camera.get_roi()
         self._camera.set_roi(value, sy, w, h)
+        self._reserve_buffer()
 
     def set_starty(self, value):
         sx, _, w, h = self._camera.get_roi()
         self._camera.set_roi(sx, value, w, h)
+        self._reserve_buffer()
 
     def abortexposure(self):
         pass  # TODO!
@@ -361,7 +404,12 @@ class ZwoCamera(AscomCamera):
     def stoptexposure(self):
         self._camera.stop_exposure()
 
-    def startexposure(self, duration: float, light=True):
+    def startexposure(self, duration: float, light=True, save=False):
+        if save:
+            self._new_filename = "file.png"  # TODO: filename generator!
+        else:
+            self._new_filename = None
         log.info(f"Starting exposure: {duration}s")
         self._camera.set_control_value(asi.ASI_EXPOSURE, int(duration * ONE_SECOND_IN_MICROSECONDS))
         self._camera.start_exposure(is_dark=not light)
+        return {"Filename": self._new_filename}
