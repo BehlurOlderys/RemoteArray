@@ -4,6 +4,17 @@ import time
 import numpy as np
 import tkinter as tk
 from PIL import Image, ImageTk
+from ascom_camera import CameraState
+
+
+ascom_states ={
+    int(CameraState.IDLE): "IDLE",
+    int(CameraState.WAITING): "WAITING",
+    int(CameraState.EXPOSING): "EXPOSING",
+    int(CameraState.READING): "READING",
+    int(CameraState.DOWNLOAD): "DOWNLOAD",
+    int(CameraState.ERROR): "ERROR",
+}
 
 
 class RequestCounter:
@@ -62,17 +73,16 @@ class CameraRequests(AscomRequests):
 
     def is_image_ready(self):
         r = self._get_request("imageready").json()
-        print(r)
         return r["Value"]
 
 
 rc = RequestCounter()
-c = CameraRequests(camera_no=0, address="http://192.168.0.45:8080", counter=rc, cid=123)
+c = CameraRequests(camera_no=0, address="http://192.168.0.129:8080", counter=rc, cid=123)
 
 
 root = tk.Tk()
 
-refresh_time_ms = 300
+refresh_time_ms = 1000
 
 
 img = ImageTk.PhotoImage(Image.open("../file.png"))
@@ -92,7 +102,9 @@ def callback():
         filename = c.put_startexposure(exposure_s)["Filename"]
         time.sleep(exposure_s)
         while not c.is_image_ready():
-            time.sleep(exposure_s)
+            state = c.get_camerastate()["Value"]
+            print(f"Camera state = {ascom_states[state]}")
+            time.sleep(5*exposure_s)
         # image_bytes = io.BytesIO(c.get_image_bytes().content)
 
         time_start = time.time()

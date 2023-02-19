@@ -1,4 +1,4 @@
-from .ascom_device import AscomDevice
+from ascom_device import AscomDevice
 from abc import abstractmethod
 from enum import IntEnum
 

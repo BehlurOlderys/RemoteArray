@@ -1,10 +1,8 @@
-from .ascom_camera import AscomCamera, CameraState
+from ascom_camera import AscomCamera, CameraState
 import zwoasi as asi
 import logging
 import numpy as np
 import base64
-from PIL import Image
-
 
 log = logging.getLogger('main')
 
@@ -15,6 +13,14 @@ asi_initialized = False
 ONE_SECOND_IN_MILLISECONDS = 1000
 ONE_MILLISECOND_IN_MICROSECONDS = 1000
 ONE_SECOND_IN_MICROSECONDS = ONE_SECOND_IN_MILLISECONDS * ONE_MILLISECOND_IN_MICROSECONDS
+
+
+exp_states = {
+    asi.ASI_EXP_IDLE: "Idle",
+    asi.ASI_EXP_FAILED: "Failed",
+    asi.ASI_EXP_SUCCESS: "Success",
+    asi.ASI_EXP_WORKING: "Working"
+}
 
 
 class ZwoCamera(AscomCamera):
