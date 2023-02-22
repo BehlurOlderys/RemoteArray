@@ -78,7 +78,7 @@ class ZwoCamera(AscomCamera):
 
     def save_image_to_file(self, filename):
         self._store_imagebytes()
-        whbi = self.get_roi_format()
+        whbi = self._camera.get_roi_format()
         shape = [whbi[1], whbi[0]]
         if whbi[3] == asi.ASI_IMG_RAW8 or whbi[3] == asi.ASI_IMG_Y8:
             img = np.frombuffer(self._buffer, dtype=np.uint8)

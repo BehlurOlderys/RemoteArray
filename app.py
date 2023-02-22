@@ -7,6 +7,7 @@ from .zwo_camera import ZwoCamera
 from .camera_capture_resource import CameraCaptureResource
 from .image_download_resource import ImageDownloadResource
 from datetime import datetime
+import os
 
 
 class DefaultServerTransactionIDGenerator:
@@ -21,14 +22,27 @@ class DefaultServerTransactionIDGenerator:
 
 class DefaultCaptureFilenameGenerator:
     def __init__(self, prefix):
+        self._last_dir = None
         self._number = 0
         self._prefix = prefix
 
     def generate(self):
+        current_day = datetime.now().strftime("%Y-%m-%d")
+        new_dir = os.path.join(os.getcwd(), current_day)
+
+        if self._last_dir is None:
+            self._last_dir = new_dir
+            os.makedirs(self._last_dir)
+
+        elif self._last_dir != new_dir:
+            os.makedirs(os.path.join(os.getcwd(), self._last_dir))
+            self._last_dir = new_dir
+
         dt_string = datetime.now().strftime("_%Y%m%d_%H%M%S")
-        fn = self._prefix + dt_string + "_Capture_{0:05d}.png".format(self._number)
+        fn = self._prefix + dt_string + "_Capture_{0:05d}.tif".format(self._number)
+        fp = os.path.join(self._last_dir, fn)
         self._number += 1
-        return fn
+        return fp
 
 
 class DummyResource:

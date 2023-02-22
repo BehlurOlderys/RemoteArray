@@ -56,7 +56,9 @@ camera_get_settings = {
     "gainmax": lambda camera: camera.get_gainmax(),
     "heatsinktemperature": lambda camera: camera.get_heatsinktemperature(),
     "imagefile": None,
-    "imagebytes": None
+    "imagebytes": None,
+    "saveimageandsendbytes": None,
+    "saveimage": None
 }
 
 camera_put_settings = {
@@ -163,8 +165,8 @@ class CameraResource:
         })
         resp.status = falcon.HTTP_200
 
-    def _handle_regular_get(self, req, resp, method):
-        value = method()
+    def _handle_regular_get(self, camera, req, resp, method):
+        value = method(camera)
         log.debug(f"Will try to respond with value={value}")
         client_id, client_transaction_id = get_optional_query_params_for_ascom(req, "GET")
         log.debug(f"ClientID of request = {client_id}")
@@ -215,8 +217,8 @@ class CameraResource:
             self._send_image_array(req, resp, camera)
             return
         else:
-            method = camera_get_settings[setting_name](camera)
-            self._handle_regular_get(req, resp, method)
+            method = camera_get_settings[setting_name]
+            self._handle_regular_get(camera, req, resp, method)
 
     def on_put(self, req, resp, camera_id, setting_name):
         log.debug(f"PUT: Looking for setting named {setting_name}")
