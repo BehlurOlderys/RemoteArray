@@ -3,7 +3,6 @@ from .camera_server_utils import get_optional_query_params_for_ascom
 from .camera_server_utils import check_camera_id
 import json
 import logging
-import os
 
 
 log = logging.getLogger('main')
@@ -101,14 +100,90 @@ camera_put_settings = {
 }
 
 
+def send_image_bytes(camera, resp):
+    image_bytes, length = camera.get_imagebytes()
+    resp.content_type = "application/octet-stream"
+    resp.data = image_bytes
+    resp.content_length = length
+    resp.status = falcon.HTTP_200
+
+
+def save_image_to_file(camera, resp, filename):
+    camera.save_image_to_file(filename)
+    resp.status = falcon.HTTP_200
+
+
+def save_image_and_send_bytes(camera, resp, filename):
+    image_bytes, length = camera.save_to_file_and_get_imagebytes(filename)
+    resp.content_type = "application/octet-stream"
+    resp.data = image_bytes
+    resp.content_length = length
+    resp.status = falcon.HTTP_200
+
+
 class CameraResource:
-    def __init__(self, cameras, generator):
+    def __init__(self, cameras, id_generator):
         self._cameras = cameras
-        self._server_transaction_id_generator = generator
+        self._server_transaction_id_generator = id_generator
+
+    def _send_image_array(self, req, resp, camera):
+        img = camera_get_settings["imagearray"](camera)
+        log.info(req.headers)
+
+        rank, dim0, dim1, dim2 = camera.get_image_specs()
+        log.info(f"Image shape = {img.shape}, rank={rank}, dim0={dim0}, dim1={dim1}")
+        try:
+            client_id, client_transaction_id = get_optional_query_params_for_ascom(req, "GET")
+        except Exception:
+            resp.status = falcon.HTTP_400
+            return
+
+        if client_id < 0 or client_transaction_id < 0:
+            resp.status = falcon.HTTP_400
+            return
+
+        log.debug(f"ClientID of request = {client_id}")
+        server_transaction_id = self._server_transaction_id_generator.generate()
+        log.debug(f"Responding with id = {server_transaction_id}")
+        error_number = 0  # TODO!
+        error_message = ""  # TODO!
+        list_image = img.tolist()
+
+        resp.text = json.dumps({
+            "Type": 2,
+            "Rank": rank,
+            # "Dimension0Length": dim0,
+            # "Dimension1Length": dim1,
+            # "Dimension2Length": dim2,
+            "ClientTransactionID": client_transaction_id,
+            "ServerTransactionID": server_transaction_id,
+            "ErrorNumber": error_number,
+            "ErrorMessage": error_message,
+            "Value": list_image
+        })
+        resp.status = falcon.HTTP_200
+
+    def _handle_regular_get(self, req, resp, method):
+        value = method()
+        log.debug(f"Will try to respond with value={value}")
+        client_id, client_transaction_id = get_optional_query_params_for_ascom(req, "GET")
+        log.debug(f"ClientID of request = {client_id}")
+        server_transaction_id = self._server_transaction_id_generator.generate()
+        log.debug(f"Responding with id = {server_transaction_id}")
+        error_number = 0  # TODO!
+        error_message = ""  # TODO!
+
+        resp.text = json.dumps({
+            "ClientTransactionID": client_transaction_id,
+            "ServerTransactionID": server_transaction_id,
+            "ErrorNumber": error_number,
+            "ErrorMessage": error_message,
+            "Value": value
+        })
+        resp.status = falcon.HTTP_200
 
     def on_get(self, req : falcon.Request, resp: falcon.Response, camera_id, setting_name):
         log.debug(f"GET: Looking for setting named {setting_name}")
-
         if not check_camera_id(camera_id, self._cameras, resp):
             return
 
@@ -118,84 +193,30 @@ class CameraResource:
             return
 
         log.debug("Prerequisites OK")
-        camera = self._cameras[int(camera_id)]["instance"]
+        cameras_entry = self._cameras[int(camera_id)]
+        camera = cameras_entry["instance"]
         # TODO: an error can happen above!
 
-        if setting_name == "imagebytes":
-            image_bytes, length = camera.get_imagebytes()
-            resp.content_type = "application/octet-stream"
-            resp.data = image_bytes
-            resp.content_length = length
+        if setting_name == "saveimage":
+            filename = cameras_entry["generator"].generate()
+            save_image_to_file(camera, resp, filename)
             return
 
-        if setting_name == "imagefile":
-            img, filename = camera.get_imagearray()
-            resp.content_type = "image/png"
-            resp.set_stream(open(filename, 'rb'), os.path.getsize(filename))
+        if setting_name == "saveimageandsendbytes":
+            filename = cameras_entry["generator"].generate()
+            save_image_and_send_bytes(camera, resp, filename)
+            return
+
+        if setting_name == "imagebytes":
+            send_image_bytes(camera, resp)
             return
 
         if setting_name == "imagearray":
-            img = camera_get_settings[setting_name](camera)
-            log.info(req.headers)
-
-            # base64_bytes = base64.b64encode(img)
-            # base64_message = base64_bytes.decode('ascii')
-
-            rank, dim0, dim1, dim2 = camera.get_image_specs()
-            log.info(f"Image shape = {img.shape}, rank={rank}, dim0={dim0}, dim1={dim1}")
-            try:
-                client_id, client_transaction_id = get_optional_query_params_for_ascom(req, "GET")
-            except Exception:
-                resp.status = falcon.HTTP_400
-                return
-
-            if client_id < 0 or client_transaction_id < 0:
-                resp.status = falcon.HTTP_400
-                return
-
-            log.debug(f"ClientID of request = {client_id}")
-            server_transaction_id = self._server_transaction_id_generator.generate()
-            log.debug(f"Responding with id = {server_transaction_id}")
-            error_number = 0  # TODO!
-            error_message = ""  # TODO!
-            list_image = img.tolist()
-
-            resp.text = json.dumps({
-                "Type": 2,
-                "Rank": rank,
-                # "Dimension0Length": dim0,
-                # "Dimension1Length": dim1,
-                # "Dimension2Length": dim2,
-                "ClientTransactionID": client_transaction_id,
-                "ServerTransactionID": server_transaction_id,
-                "ErrorNumber": error_number,
-                "ErrorMessage": error_message,
-                "Value": list_image
-            })
-            # log.debug(f"returned JSON: {resp.text}")
-
-            # resp.set_header("base64handoff", "true")
-            resp.status = falcon.HTTP_200
+            self._send_image_array(req, resp, camera)
             return
         else:
-            value = camera_get_settings[setting_name](camera)
-            log.debug(f"Will try to respond with value={value}")
-
-        client_id, client_transaction_id = get_optional_query_params_for_ascom(req, "GET")
-        log.debug(f"ClientID of request = {client_id}")
-        server_transaction_id = self._server_transaction_id_generator.generate()
-        log.debug(f"Responding with id = {server_transaction_id}")
-        error_number = 0  # TODO!
-        error_message = ""  # TODO!
-
-        resp.text = json.dumps({
-          "ClientTransactionID": client_transaction_id,
-          "ServerTransactionID": server_transaction_id,
-          "ErrorNumber": error_number,
-          "ErrorMessage": error_message,
-          "Value": value
-        })
-        resp.status = falcon.HTTP_200
+            method = camera_get_settings[setting_name](camera)
+            self._handle_regular_get(req, resp, method)
 
     def on_put(self, req, resp, camera_id, setting_name):
         log.debug(f"PUT: Looking for setting named {setting_name}")

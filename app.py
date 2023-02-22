@@ -6,7 +6,6 @@ from .cameras_list_resource import CamerasListResource
 from .zwo_camera import ZwoCamera
 from .camera_capture_resource import CameraCaptureResource
 from .image_download_resource import ImageDownloadResource
-import numpy as np
 from datetime import datetime
 
 
@@ -69,12 +68,13 @@ for k,v in cameras_dict.items():
         log.debug(vv)
 
 server_transaction_id_generator = DefaultServerTransactionIDGenerator()
+camera_resource = CameraResource(cameras_dict, server_transaction_id_generator)
 
 app.add_route("/api/v1/status", StatusResource())
 app.add_route("/api/v1/cameras/list", CamerasListResource(cameras_dict))
 app.add_route("/api/v1/camera/{camera_id}/capture", CameraCaptureResource(cameras_dict))
 app.add_route("/api/v1/camera/{camera_id}/images/status/{image_name}", DummyResource()) #ImageStatusResource(cameras_dict))
 app.add_route("/api/v1/camera/{camera_id}/images/download/{image_name}", ImageDownloadResource(cameras_dict))
-app.add_route("/api/v1/camera/{camera_id}/{setting_name}", CameraResource(cameras_dict, server_transaction_id_generator))
+app.add_route("/api/v1/camera/{camera_id}/{setting_name}", camera_resource)
 
 

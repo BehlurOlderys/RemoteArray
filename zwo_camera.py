@@ -1,13 +1,19 @@
-from ascom_camera import AscomCamera, CameraState
+from .ascom_camera import AscomCamera, CameraState
 import zwoasi as asi
 import logging
 import numpy as np
 import base64
+import os
+from PIL import Image
+
 
 log = logging.getLogger('main')
 
 
-asi_lib_path = "C:\\ASI SDK\\lib\\x64\\ASICamera2.dll"
+if os.name == "nt": 
+    asi_lib_path = "C:\\ASI SDK\\lib\\x64\\ASICamera2.dll"
+else:
+    asi_lib_path = "/usr/local/lib/libASICamera2.so.1.27"
 asi_initialized = False
 
 ONE_SECOND_IN_MILLISECONDS = 1000
@@ -28,14 +34,14 @@ class ZwoCamera(AscomCamera):
         self._state = CameraState.IDLE
         self._camera = asi.Camera(camera_index)
         self._index = camera_index
-        self._camera.set_control_value(asi.ASI_HIGH_SPEED_MODE, 1)
-        self._camera.set_control_value(asi.ASI_BANDWIDTHOVERLOAD, 60)
+        self._camera.set_control_value(asi.ASI_HIGH_SPEED_MODE, 0)
+        self._camera.set_control_value(asi.ASI_BANDWIDTHOVERLOAD, 40)
         self._camera.set_control_value(asi.ASI_GAIN, 17)
-        self._camera.set_control_value(asi.ASI_EXPOSURE, 5 * ONE_SECOND_IN_MICROSECONDS)
+        self._camera.set_control_value(asi.ASI_EXPOSURE, 1 * ONE_SECOND_IN_MICROSECONDS)
         self._camera.set_image_type(asi.ASI_IMG_RGB24)
         self._connected = True
         self._new_filename = None
-
+        self._last_duration = 1
         log.info(f"ROI FORMAT = {self._camera.get_roi_format()}")
 
         self._buffer = None
@@ -69,6 +75,35 @@ class ZwoCamera(AscomCamera):
     def get_imagebytes(self):
         self._store_imagebytes()
         return self._get_buffer()
+
+    def save_image_to_file(self, filename):
+        self._store_imagebytes()
+        whbi = self.get_roi_format()
+        shape = [whbi[1], whbi[0]]
+        if whbi[3] == asi.ASI_IMG_RAW8 or whbi[3] == asi.ASI_IMG_Y8:
+            img = np.frombuffer(self._buffer, dtype=np.uint8)
+        elif whbi[3] == asi.ASI_IMG_RAW16:
+            img = np.frombuffer(self._buffer, dtype=np.uint16)
+        elif whbi[3] == asi.ASI_IMG_RGB24:
+            img = np.frombuffer(self._buffer, dtype=np.uint8)
+            shape.append(3)
+        else:
+            raise ValueError('Unsupported image type')
+        img = img.reshape(shape)
+
+        mode = None
+        if len(img.shape) == 3:
+            img = img[:, :, ::-1]  # Convert BGR to RGB
+        if whbi[3] == asi.ASI_IMG_RAW16:
+            mode = 'I;16'
+        image = Image.fromarray(img, mode=mode)
+        image.save(filename)
+        log.debug('wrote %s', filename)
+
+    def save_to_file_and_get_imagebytes(self, filename):
+        self.save_image_to_file(filename)
+        return self._get_buffer()
+
 
     def get_image_specs(self):
         """
@@ -261,7 +296,6 @@ class ZwoCamera(AscomCamera):
     def get_heatsinktemperature(self):
         return 0  # TODO!!!
 
-
     def get_imagearray(self):
         filename = self._new_filename  # TODO this can be somehow customized
         data = self._camera.get_data_after_exposure(None)
@@ -307,7 +341,7 @@ class ZwoCamera(AscomCamera):
         pass  # TODO!
 
     def get_lastexposureduration(self):
-        pass  # TODO!
+        return self._last_duration
 
     def get_lastexposurestarttime(self):
         pass  # TODO!
@@ -416,6 +450,8 @@ class ZwoCamera(AscomCamera):
         else:
             self._new_filename = None
         log.info(f"Starting exposure: {duration}s")
-        self._camera.set_control_value(asi.ASI_EXPOSURE, int(duration * ONE_SECOND_IN_MICROSECONDS))
+        if self._last_duration != duration:
+            self._last_duration = duration
+            self._camera.set_control_value(asi.ASI_EXPOSURE, int(duration * ONE_SECOND_IN_MICROSECONDS))
         self._camera.start_exposure(is_dark=not light)
         return {"Filename": self._new_filename}
