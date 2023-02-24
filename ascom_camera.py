@@ -1,4 +1,4 @@
-from ascom_device import AscomDevice
+from .ascom_device import AscomDevice
 from abc import abstractmethod
 from enum import IntEnum
 
@@ -406,6 +406,13 @@ class AscomCamera(AscomDevice):
         """
         The camera's gain (GAIN VALUE MODE) OR
         the index of the selected camera gain description in the Gains array (GAINS INDEX MODE).
+        """
+        pass
+
+    @abstractmethod
+    def set_readoutmode(self, value):
+        """
+        Sets the ReadoutMode as an index into the array ReadoutModes.
         """
         pass
 

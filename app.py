@@ -28,7 +28,7 @@ class DefaultCaptureFilenameGenerator:
 
     def generate(self):
         current_day = datetime.now().strftime("%Y-%m-%d")
-        new_dir = os.path.join(os.getcwd(), current_day)
+        new_dir = os.path.join(os.getcwd(), "capture", current_day)
 
         if self._last_dir is None:
             self._last_dir = new_dir

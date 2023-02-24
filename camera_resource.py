@@ -2,7 +2,10 @@ import falcon.status_codes
 from .camera_server_utils import get_optional_query_params_for_ascom
 from .camera_server_utils import check_camera_id
 import json
+import os
 import logging
+from traceback import format_exc
+import glob
 
 
 log = logging.getLogger('main')
@@ -24,6 +27,8 @@ camera_get_settings = {
     "canstopexposure": lambda camera: camera.get_canstopexposure(),
     "canabortexposure": lambda camera: camera.get_canabortexposure(),
 
+    "readoutmode": lambda camera: camera.get_readoutmode(),
+    "readoutmodes": lambda camera: camera.get_readoutmodes(),
     "pixelsizex": lambda camera: camera.get_pixelsizex(),
     "pixelsizey": lambda camera: camera.get_pixelsizey(),
     "interfaceversion": lambda camera: camera.get_interfaceversion(),
@@ -58,7 +63,8 @@ camera_get_settings = {
     "imagefile": None,
     "imagebytes": None,
     "saveimageandsendbytes": None,
-    "saveimage": None
+    "saveimage": None,
+    "lastimage": None
 }
 
 camera_put_settings = {
@@ -73,6 +79,9 @@ camera_put_settings = {
     },
     "numy": {
         "method": lambda camera, args: camera.set_numy(int(args["NumY"])),
+    },
+    "readoutmode": {
+        "method": lambda camera, args: camera.set_readoutmode(int(args["ReadoutMode"])),
     },
     "binx": {
         "method": lambda camera, args: camera.set_binx(int(args["BinX"])),
@@ -110,6 +119,27 @@ def send_image_bytes(camera, resp):
     resp.status = falcon.HTTP_200
 
 
+def get_latest_file_name():
+    all_subdirs = [d for d in os.listdir(os.path.join(os.getcwd(), "capture")) if os.path.isdir(d)]
+    latest_subdir = max(all_subdirs, key=os.path.getmtime)
+    list_of_files = glob.glob(latest_subdir+"/*.tif")
+    print(f"List of files: {list_of_files}")
+    latest_file = max(list_of_files, key=os.path.getctime)
+    return latest_file
+
+
+def retrieve_file_image(resp, filename):
+    resp.content_type = "image/tif"
+    stream = open(filename, 'rb')
+    content_length = os.path.getsize(filename)
+    resp.stream, resp.content_length = stream, content_length
+    resp.status = falcon.HTTP_200
+
+
+def retrieve_last_image(resp):
+    retrieve_file_image(resp, get_latest_file_name())
+
+
 def save_image_to_file(camera, resp, filename):
     camera.save_image_to_file(filename)
     resp.status = falcon.HTTP_200
@@ -136,7 +166,8 @@ class CameraResource:
         log.info(f"Image shape = {img.shape}, rank={rank}, dim0={dim0}, dim1={dim1}")
         try:
             client_id, client_transaction_id = get_optional_query_params_for_ascom(req, "GET")
-        except Exception:
+        except Exception as e:
+            resp.text = json.dumps({"error": repr(e), "trace": format_exc()})
             resp.status = falcon.HTTP_400
             return
 
@@ -168,7 +199,12 @@ class CameraResource:
     def _handle_regular_get(self, camera, req, resp, method):
         value = method(camera)
         log.debug(f"Will try to respond with value={value}")
-        client_id, client_transaction_id = get_optional_query_params_for_ascom(req, "GET")
+        try:
+            client_id, client_transaction_id = get_optional_query_params_for_ascom(req, "GET")
+        except Exception as e:
+            resp.text = json.dumps({"error": repr(e), "trace": format_exc()})
+            resp.status = falcon.HTTP_400
+            return
         log.debug(f"ClientID of request = {client_id}")
         server_transaction_id = self._server_transaction_id_generator.generate()
         log.debug(f"Responding with id = {server_transaction_id}")
@@ -198,6 +234,10 @@ class CameraResource:
         cameras_entry = self._cameras[int(camera_id)]
         camera = cameras_entry["instance"]
         # TODO: an error can happen above!
+
+        if setting_name == "lastimage":
+            retrieve_last_image(resp)
+            return
 
         if setting_name == "saveimage":
             filename = cameras_entry["generator"].generate()
@@ -239,13 +279,18 @@ class CameraResource:
             result = method(camera, form)
         except Exception as e:
             log.error(e)
-            resp.text = str(e)
+            resp.text = json.dumps({"error": repr(e), "trace": format_exc()})
             resp.status = falcon.HTTP_400
             return
 
         # TODO: an error can happen above!
 
-        client_id, client_transaction_id = get_optional_query_params_for_ascom(req, "PUT")
+        try:
+            client_id, client_transaction_id = get_optional_query_params_for_ascom(req, "PUT")
+        except Exception as e:
+            resp.text = json.dumps({"error": repr(e), "trace": format_exc()})
+            resp.status = falcon.HTTP_400
+            return
         log.debug(f"ClientID of request = {client_id}")
         server_transaction_id = self._server_transaction_id_generator.generate()
         log.debug(f"Responding with id = {server_transaction_id}")

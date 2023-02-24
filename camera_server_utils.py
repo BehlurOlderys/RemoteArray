@@ -7,14 +7,13 @@ log = logging.getLogger('main')
 
 
 def get_optional_query_params_for_ascom(req: falcon.Request, method: str):
-
     if method == "GET":
-        client_id = req.params.get("ClientID")
-        client_transaction_id = req.params.get("ClientTransactionID")
+        client_id = req.params["ClientID"]
+        client_transaction_id = req.params["ClientTransactionID"]
 
     if method == "PUT":
-        client_id = req.media.get("ClientID")
-        client_transaction_id = req.media.get("ClientTransactionID")
+        client_id = req.media["ClientID"]
+        client_transaction_id = req.media["ClientTransactionID"]
 
     return int(client_id), int(client_transaction_id)
 

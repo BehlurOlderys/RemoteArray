@@ -28,13 +28,22 @@ exp_states = {
     asi.ASI_EXP_WORKING: "Working"
 }
 
+image_types_by_name = {
+    "RAW8": asi.ASI_IMG_RAW8,
+    "RGB24": asi.ASI_IMG_RGB24,
+    "RAW16": asi.ASI_IMG_RAW16,
+    "Y8": asi.ASI_IMG_Y8
+}
+
+image_types_by_value = {v: k for k, v in image_types_by_name.items()}
+
 
 class ZwoCamera(AscomCamera):
     def __init__(self, camera_index):
         self._state = CameraState.IDLE
         self._camera = asi.Camera(camera_index)
         self._index = camera_index
-        self._camera.set_control_value(asi.ASI_HIGH_SPEED_MODE, 0)
+        # self._camera.set_control_value(asi.ASI_HIGH_SPEED_MODE, 0)
         self._camera.set_control_value(asi.ASI_BANDWIDTHOVERLOAD, 40)
         self._camera.set_control_value(asi.ASI_GAIN, 17)
         self._camera.set_control_value(asi.ASI_EXPOSURE, 1 * ONE_SECOND_IN_MICROSECONDS)
@@ -377,10 +386,14 @@ class ZwoCamera(AscomCamera):
         pass  # TODO!
 
     def get_readoutmode(self):
-        pass  # TODO!
+        mode = self._camera.get_image_type()
+        return mode
 
     def get_readoutmodes(self):
-        pass  # TODO!
+        camera_info = self._camera.get_camera_property()
+        supported = camera_info['SupportedVideoFormat']
+        print(f"Supported = {supported}")
+        return [image_types_by_value[s] for s in sorted(supported)]
 
     def get_sensortype(self):
         # if not self._camera.get_camera_property()["IsColorCam"]:
@@ -409,6 +422,9 @@ class ZwoCamera(AscomCamera):
         whbi[2] = new_bins
 
         self._camera.set_roi_format(*whbi)
+
+    def set_readoutmode(self, value):
+        self._camera.set_image_type(value)
 
     def set_binx(self, value):
         self._set_bins(value)
