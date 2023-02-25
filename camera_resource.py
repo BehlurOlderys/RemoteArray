@@ -9,6 +9,7 @@ import glob
 
 
 log = logging.getLogger('main')
+capture_path = os.path.join(os.getcwd(), "capture")
 
 
 camera_get_settings = {
@@ -120,10 +121,10 @@ def send_image_bytes(camera, resp):
 
 
 def get_latest_file_name():
-    all_subdirs = [d for d in os.listdir(os.path.join(os.getcwd(), "capture")) if os.path.isdir(d)]
+    cwd_contents = [os.path.join(capture_path, d) for d in os.listdir(capture_path)]
+    all_subdirs = [d for d in cwd_contents if os.path.isdir(d)]
     latest_subdir = max(all_subdirs, key=os.path.getmtime)
     list_of_files = glob.glob(latest_subdir+"/*.tif")
-    print(f"List of files: {list_of_files}")
     latest_file = max(list_of_files, key=os.path.getctime)
     return latest_file
 
@@ -236,7 +237,11 @@ class CameraResource:
         # TODO: an error can happen above!
 
         if setting_name == "lastimage":
-            retrieve_last_image(resp)
+            try:
+                retrieve_last_image(resp)
+            except ValueError as e:
+                resp.text = json.dumps({"error": repr(e), "trace": format_exc()})
+                resp.status = falcon.HTTP_412
             return
 
         if setting_name == "saveimage":
