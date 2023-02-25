@@ -1,0 +1,1 @@
+@reboot /home/pi/workspace/samyang_app/on_boot.sh >> /var/log/server_startup.log 2>&1 &

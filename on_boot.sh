@@ -5,5 +5,3 @@ cd ${SCRIPT_DIR}
 source ${SCRIPT_DIR}/.venv/bin/activate
 
 waitress-serve --port=8080 samyang_app.app:app
-
-logger "Started waitress serving on port 8080"

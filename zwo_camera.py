@@ -47,7 +47,8 @@ class ZwoCamera(AscomCamera):
         self._camera.set_control_value(asi.ASI_BANDWIDTHOVERLOAD, 40)
         self._camera.set_control_value(asi.ASI_GAIN, 17)
         self._camera.set_control_value(asi.ASI_EXPOSURE, 1 * ONE_SECOND_IN_MICROSECONDS)
-        self._camera.set_image_type(asi.ASI_IMG_RGB24)
+        supported = self._camera.get_camera_property()['SupportedVideoFormat']
+        self._camera.set_image_type(supported[0])
         self._connected = True
         self._new_filename = None
         self._last_duration = 1
@@ -64,6 +65,7 @@ class ZwoCamera(AscomCamera):
             sz *= 3
         elif whbi[3] == asi.ASI_IMG_RAW16:
             sz *= 2
+        log.info(f"Reserving buffer of size {whbi[0]}x{whbi[1]}={sz}")
 
         if self._buffer is None:
             self._buffer_size = sz
@@ -424,7 +426,18 @@ class ZwoCamera(AscomCamera):
         self._camera.set_roi_format(*whbi)
 
     def set_readoutmode(self, value):
-        self._camera.set_image_type(value)
+        camera_info = self._camera.get_camera_property()
+        supported = camera_info['SupportedVideoFormat']
+
+        # list like "RGB8, RAW16"
+        used_list = [image_types_by_value[s] for s in sorted(supported)]
+
+        #value of 1 means RAW16 in above example
+        image_type_name = used_list[value]
+
+        # finally translate name into camera index and change:
+        self._camera.set_image_type(image_types_by_name[image_type_name])
+        self._reserve_buffer()
 
     def set_binx(self, value):
         self._set_bins(value)
