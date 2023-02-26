@@ -186,9 +186,6 @@ class CameraResource:
         resp.text = json.dumps({
             "Type": 2,
             "Rank": rank,
-            # "Dimension0Length": dim0,
-            # "Dimension1Length": dim1,
-            # "Dimension2Length": dim2,
             "ClientTransactionID": client_transaction_id,
             "ServerTransactionID": server_transaction_id,
             "ErrorNumber": error_number,
@@ -221,7 +218,7 @@ class CameraResource:
         })
         resp.status = falcon.HTTP_200
 
-    def on_get(self, req : falcon.Request, resp: falcon.Response, camera_id, setting_name):
+    def on_get(self, req: falcon.Request, resp: falcon.Response, camera_id, setting_name):
         log.debug(f"GET: Looking for setting named {setting_name}")
         if not check_camera_id(camera_id, self._cameras, resp):
             return

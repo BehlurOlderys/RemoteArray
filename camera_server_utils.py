@@ -10,10 +10,11 @@ def get_optional_query_params_for_ascom(req: falcon.Request, method: str):
     if method == "GET":
         client_id = req.params["ClientID"]
         client_transaction_id = req.params["ClientTransactionID"]
-
-    if method == "PUT":
+    elif method == "PUT":
         client_id = req.media["ClientID"]
         client_transaction_id = req.media["ClientTransactionID"]
+    else:
+        raise RuntimeError(f"Method will not be handled: {method}")
 
     return int(client_id), int(client_transaction_id)
 
@@ -21,7 +22,7 @@ def get_optional_query_params_for_ascom(req: falcon.Request, method: str):
 def check_camera_id(camera_id, cameras, resp):
     try:
         if int(camera_id) not in cameras.keys():
-            log.warn(f"There is no camera no. {camera_id}")
+            log.warning(f"There is no camera no. {camera_id}")
             resp.text = json.dumps({"error": f"camera with id {camera_id} not found"})
             resp.status = falcon.HTTP_404
             return False

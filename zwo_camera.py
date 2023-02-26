@@ -115,7 +115,6 @@ class ZwoCamera(AscomCamera):
         self.save_image_to_file(filename)
         return self._get_buffer()
 
-
     def get_image_specs(self):
         """
         :return: tuple with elements:
@@ -432,7 +431,7 @@ class ZwoCamera(AscomCamera):
         # list like "RGB8, RAW16"
         used_list = [image_types_by_value[s] for s in sorted(supported)]
 
-        #value of 1 means RAW16 in above example
+        # value of 1 means RAW16 in above example
         image_type_name = used_list[value]
 
         # finally translate name into camera index and change:

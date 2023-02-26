@@ -1,7 +1,6 @@
 import logging
 from multiprocessing import Event, Pipe
 from zwo_camera import ZwoCamera
-import time
 
 
 log = logging.getLogger('camera_process')
@@ -14,8 +13,8 @@ log.addHandler(camHandler)
 
 
 class CameraProcessInfo:
-    def __init__(self, id):
-        self.camera_id = id
+    def __init__(self, cid):
+        self.camera_id = cid
 
 
 def camera_process(info: CameraProcessInfo, in_pipe: Pipe, out_pipe: Pipe, data_pipe: Pipe, kill_event: Event):
@@ -38,14 +37,14 @@ def camera_process(info: CameraProcessInfo, in_pipe: Pipe, out_pipe: Pipe, data_
         elif command == "imageready":
             out_pipe.send(camera.get_imageready())
         elif command == "capture":
-            data_pipe.send(camera.capture())
+            # data_pipe.send(camera.capture())
+            pass
         elif command == "startexposure":
-            out_pipe.send(camera.startexposure(duration=None))
+            # out_pipe.send(camera.startexposure(duration=None))
+            pass
         elif command == "imagebytes":
             out_pipe.send("OK")
             data_pipe.send(camera.get_imagebytes())
         else:
             log.warning(f"Got strange command: {command}")
     log.info("Camera process ended!")
-
-

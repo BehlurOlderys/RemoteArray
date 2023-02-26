@@ -9,12 +9,11 @@ class CameraCaptureResource:
         self._cameras = cameras
 
     def on_post(self, req, resp, camera_id):
-
         if not check_camera_id(camera_id, self._cameras, resp):
             print(f"POST on capture failed!")
             return
+        generator = self._cameras[int(camera_id)]["generator"]
         try:
-            generator = self._cameras[int(camera_id)]["generator"]
             raw_data = json.load(req.bounded_stream)
             print(f"Acquired some data from POST on capture endpoint: {raw_data}")
         except json.JSONDecodeError:
@@ -26,4 +25,3 @@ class CameraCaptureResource:
         camera.capture_file(image_id)
         resp.text = json.dumps({"image_id": image_id})
         resp.status = falcon.HTTP_202
-

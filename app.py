@@ -45,11 +45,6 @@ class DefaultCaptureFilenameGenerator:
         return fp
 
 
-class DummyResource:
-    def on_get(self, req, resp):
-        resp.status = falcon.HTTP_501
-
-
 log = logging.getLogger('main')
 log.setLevel(logging.DEBUG)
 mainHandler = logging.FileHandler('main.log')
@@ -68,14 +63,10 @@ cameras_dict = {i: {"name": n,
                     "image_path": "",
                     "generator": DefaultCaptureFilenameGenerator(f"camera_{i}")} for i, n in cameras_dict.items()}
 
-# ar = np.zeros((5, 7))
-# print(f"Ar shape = {ar.shape}")
-# print(ar.tolist())
-
 app = application = falcon.App()
 
 
-for k,v in cameras_dict.items():
+for k, v in cameras_dict.items():
     inst = v["instance"]
     log.debug(inst.get_property())
     for kk, vv in inst.get_controls().items():
@@ -87,8 +78,5 @@ camera_resource = CameraResource(cameras_dict, server_transaction_id_generator)
 app.add_route("/api/v1/status", StatusResource())
 app.add_route("/api/v1/cameras/list", CamerasListResource(cameras_dict))
 app.add_route("/api/v1/camera/{camera_id}/capture", CameraCaptureResource(cameras_dict))
-app.add_route("/api/v1/camera/{camera_id}/images/status/{image_name}", DummyResource()) #ImageStatusResource(cameras_dict))
 app.add_route("/api/v1/camera/{camera_id}/images/download/{image_name}", ImageDownloadResource(cameras_dict))
 app.add_route("/api/v1/camera/{camera_id}/{setting_name}", camera_resource)
-
-

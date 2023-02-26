@@ -1,7 +1,4 @@
-import falcon.status_codes
-
 from .camera_server_utils import check_camera_id
-import json
 import os
 
 
@@ -9,7 +6,7 @@ class ImageDownloadResource:
     def __init__(self, cameras):
         self._cameras = cameras
 
-    def on_get(self, req, resp, camera_id, image_name):
+    def on_get(self, _req, resp, camera_id, image_name):
         if not check_camera_id(camera_id, self._cameras, resp):
             return
 
