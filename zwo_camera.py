@@ -58,6 +58,18 @@ class ZwoCamera(AscomCamera):
         self._buffer_size = 0
         self._reserve_buffer()
 
+    def set_exposure(self, duration_s):
+        self._camera.set_control_value(asi.ASI_EXPOSURE, int(duration_s * ONE_SECOND_IN_MICROSECONDS))
+        self._last_duration = duration_s
+
+    def capture(self, filename):
+        try:
+            self._camera.capture(filename=filename)
+            return True
+        except asi.ZWO_CaptureError as ce:
+            print(f"error = {ce}, status = {ce.exposure_status}")
+            return False
+
     def _reserve_buffer(self):
         whbi = self._camera.get_roi_format()
         sz = whbi[0] * whbi[1]
