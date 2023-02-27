@@ -34,3 +34,28 @@ def check_camera_id(camera_id, cameras, resp):
         resp.text = json.dumps({"error": f"cannot convert {camera_id} to an integer"})
         resp.status = falcon.HTTP_400
         return False
+
+
+class Result:
+    def __init__(self, result, error):
+        self._result = result
+        self._error = error
+
+    def ok(self):
+        return len(self._error) == 0
+
+    def get(self):
+        return self._result
+
+    def error(self):
+        return self._error
+
+
+class Error(Result):
+    def __init__(self, error):
+        super(Error, self).__init__("", error)
+
+
+class OK(Result):
+    def __init__(self, result):
+        super(OK, self).__init__(result, "")
