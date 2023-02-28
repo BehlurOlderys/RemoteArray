@@ -5,26 +5,26 @@ from .zwo_camera import ZwoCamera
 from .app_utils import add_log, DefaultServerTransactionIDGenerator
 from .camera_process import camera_process, CameraProcessInfo, CameraProcessHandle
 
-from multiprocessing import Event, Pipe, Process
+from multiprocessing import Event, Queue, Process, Pipe
 
 
 def create_camera_process(cid: int, cname: str):
     kill_event = Event()
-    command_pipe_recv, command_pipe_send = Pipe()
-    result_pipe_recv, result_pipe_send = Pipe()
+    command_queue = Queue()
+    result_queue = Queue()
     data_pipe_recv, data_pipe_send = Pipe()
 
     info = CameraProcessInfo(cid=cid,
-                             command=command_pipe_recv,
-                             result=result_pipe_send,
+                             command=command_queue,
+                             result=result_queue,
                              data=data_pipe_send,
                              ke=kill_event)
     p = Process(target=camera_process, args=(info,))
     p.start()
 
     return CameraProcessHandle(info, p, cname,
-                               result_pipe=result_pipe_recv,
-                               command_pipe=command_pipe_send,
+                               result_queue=result_queue,
+                               command_queue=command_queue,
                                data_pipe=data_pipe_recv)
 
 

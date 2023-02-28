@@ -6,6 +6,26 @@ import logging
 log = logging.getLogger('main')
 
 
+class CameraCommand:
+    def __init__(self, name, params):
+        self._name = name
+        self._params = params
+
+    def has_params(self):
+        return self.params is not None
+
+    def get_name(self):
+        return self._name
+
+    def get_params(self):
+        return self._params
+
+
+class CameraSimpleCommand(CameraCommand):
+    def __init__(self, name):
+        super(CameraSimpleCommand, self).__init__(name, params=None)
+
+
 def get_optional_query_params_for_ascom(req: falcon.Request, method: str):
     if method == "GET":
         client_id = req.params["ClientID"]
