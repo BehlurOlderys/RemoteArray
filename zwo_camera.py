@@ -402,8 +402,11 @@ class ZwoCamera(AscomCamera):
         pass  # TODO!
 
     def get_readoutmode(self):
+        camera_info = self._camera.get_camera_property()
+        supported = camera_info['SupportedVideoFormat']
+        sorted_supported = [s for s in sorted(supported)]
         mode = self._camera.get_image_type()
-        return mode
+        return sorted_supported.index(mode)
 
     def get_readoutmodes(self):
         camera_info = self._camera.get_camera_property()
@@ -494,13 +497,8 @@ class ZwoCamera(AscomCamera):
         self._camera.stop_exposure()
 
     def startexposure(self, duration: float, light=True, save=False):
-        if save:
-            self._new_filename = "file.png"  # TODO: filename generator!
-        else:
-            self._new_filename = None
         log.info(f"Starting exposure: {duration}s")
         if self._last_duration != duration:
             self._last_duration = duration
             self._camera.set_control_value(asi.ASI_EXPOSURE, int(duration * ONE_SECOND_IN_MICROSECONDS))
         self._camera.start_exposure(is_dark=not light)
-        return {"Filename": self._new_filename}

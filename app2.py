@@ -44,5 +44,4 @@ server_transaction_id_generator = DefaultServerTransactionIDGenerator()
 camera_resource = CameraProcessResource(camera_processes, server_transaction_id_generator)
 
 app.add_route("/api/v1/status", StatusResource())
-# app.add_route("/api/v1/cameras/list", CamerasListResource(cameras_dict))
 app.add_route("/api/v1/camera/{camera_id}/{setting_name}", camera_resource)
