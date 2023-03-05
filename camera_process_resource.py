@@ -15,14 +15,6 @@ log = logging.getLogger('main')
 capture_path = os.path.join(os.getcwd(), "capture")
 
 
-def send_image_bytes(camera, resp):
-    image_bytes, length = camera.get_imagebytes()
-    resp.content_type = "application/octet-stream"
-    resp.data = image_bytes
-    resp.content_length = length
-    resp.status = falcon.HTTP_200
-
-
 def get_latest_file_name():
     cwd_contents = [os.path.join(capture_path, d) for d in os.listdir(capture_path)]
     all_subdirs = [d for d in cwd_contents if os.path.isdir(d)]
@@ -80,6 +72,7 @@ class CameraProcessResource:
         return self._processes[camera_id]
 
     def on_get(self, req: falcon.Request, resp: falcon.Response, camera_id, setting_name):
+        print(f"GET {setting_name}")
         if setting_name == "lastimage":
             self._handle_lastimage(resp)
             return
@@ -87,8 +80,10 @@ class CameraProcessResource:
         if cam_handle is None:
             return
 
-        print(f"GET {setting_name}")
-        self._process_get(req, resp, cam_handle, setting_name)
+        if setting_name == "imagebytes":
+            self._handle_imagebytes(resp, cam_handle)
+        else:
+            self._process_get(req, resp, cam_handle, setting_name)
 
     def _handle_lastimage(self, resp: falcon.Response):
         try:
@@ -97,6 +92,21 @@ class CameraProcessResource:
             resp.text = json.dumps({"error": repr(e), "trace": format_exc()})
             resp.status = falcon.HTTP_412
         return
+
+    def _handle_imagebytes(self, resp: falcon.Response, cam_handle: CameraProcessHandle):
+        cam_handle.command_queue.put(CameraSimpleGETCommand("imagebytes"))
+        raw_result = cam_handle.result_queue.get()
+        if not raw_result.ok():
+            resp.status = falcon.HTTP_500
+            resp.text = raw_result.error()
+            return
+
+        data = cam_handle.data_pipe.recv()
+        imagebytes, length = data
+        resp.content_type = "application/octet-stream"
+        resp.data = imagebytes
+        resp.content_length = length
+        resp.status = falcon.HTTP_200
 
     def _check_state(self, handle: CameraProcessHandle, result_queue: Queue):
         print(f"Current state = {handle.state}")

@@ -3,9 +3,13 @@ import time
 from .zwo_camera import ZwoCamera
 from .app_utils import add_log
 from .camera_server_utils import Error, OK, CameraCommand
+import os
+from .app_utils import DefaultCaptureFilenameGenerator
 
 
 log = None
+
+capture_path = os.path.join(os.getcwd(), "capture")
 
 
 class CameraProcessHandle:
@@ -110,6 +114,7 @@ unusual_put_methods = [
 
 class CameraProcessor:
     def __init__(self, info: CameraProcessInfo):
+        self._filename_generator = DefaultCaptureFilenameGenerator(prefix="")
         self._capturing = False
         self._camera_id = info.camera_id
         self._response_queue = info.out_queue
@@ -173,9 +178,9 @@ class CameraProcessor:
             self._response_queue.put(OK(self._camera.get_imageready()))
 
     def _handle_get_imagebytes(self):
-        imagebytes = self._camera.get_imagebytes()
-        self._response_queue.put("OK")
-        self._data_pipe.send(imagebytes)
+        imagebytes, length = self._camera.get_imagebytes()
+        self._response_queue.put(OK(DONE_TOKEN))
+        self._data_pipe.send((imagebytes, length))
 
     def _handle_put(self, command_raw):
         command_name = command_raw.get_name()
@@ -235,8 +240,8 @@ class CameraProcessor:
     def _handle_set_startexposure(self, params):
         duration = int(params["Duration"])
         light = bool(params["Light"])
-        self._response_queue.put(
-            self._camera.startexposure(duration=duration, light=light))
+        self._camera.startexposure(duration=duration, light=light)
+        self._response_queue.put(OK(DONE_TOKEN))
 
     def _handle_set_capture(self, params):
         print(f"Handling capture with params: {params}!")
@@ -263,7 +268,8 @@ class CameraProcessor:
         ss = time.time()
         for i in range(0, number):
             print(f"Capturing file {i}")
-            self._camera.capture(f"file{i}.tif")  # TODO
+            fn = self._filename_generator.generate()
+            self._camera.capture(fn)
             self._response_queue.put(OK(f"{i}/{number}"))
 
         print(f"Capturing done! It took {time.time() - ss} s")

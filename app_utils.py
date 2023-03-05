@@ -26,7 +26,8 @@ class DefaultCaptureFilenameGenerator:
 
         if self._last_dir is None:
             self._last_dir = new_dir
-            os.makedirs(self._last_dir)
+            if not os.path.isdir(self._last_dir):
+                os.makedirs(self._last_dir)
 
         elif self._last_dir != new_dir:
             os.makedirs(os.path.join(os.getcwd(), self._last_dir))

@@ -4,8 +4,6 @@ from .status_resource import StatusResource
 from .camera_resource import CameraResource
 from .cameras_list_resource import CamerasListResource
 from .zwo_camera import ZwoCamera
-from .camera_capture_resource import CameraCaptureResource
-from .image_download_resource import ImageDownloadResource
 from .app_utils import add_log, DefaultCaptureFilenameGenerator, DefaultServerTransactionIDGenerator
 
 
@@ -35,6 +33,4 @@ camera_resource = CameraResource(cameras_dict, server_transaction_id_generator)
 
 app.add_route("/api/v1/status", StatusResource())
 app.add_route("/api/v1/cameras/list", CamerasListResource(cameras_dict))
-app.add_route("/api/v1/camera/{camera_id}/capture", CameraCaptureResource(cameras_dict))
-app.add_route("/api/v1/camera/{camera_id}/images/download/{image_name}", ImageDownloadResource(cameras_dict))
 app.add_route("/api/v1/camera/{camera_id}/{setting_name}", camera_resource)
