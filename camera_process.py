@@ -83,9 +83,8 @@ unusual_get_methods = [
     "list",
     "imageready",
     "imagebytes",
-    # "saveimageandsendbytes",
-    # "saveimage",
-    # "lastimage"
+    "saveimageandsendbytes",
+    "saveimage"
 ]
 
 regular_put_methods = [

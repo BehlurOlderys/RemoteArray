@@ -7,9 +7,54 @@ import logging
 import json
 from multiprocessing import Queue
 from traceback import format_exc
+import os
+import glob
 
 
 log = logging.getLogger('main')
+capture_path = os.path.join(os.getcwd(), "capture")
+
+
+def send_image_bytes(camera, resp):
+    image_bytes, length = camera.get_imagebytes()
+    resp.content_type = "application/octet-stream"
+    resp.data = image_bytes
+    resp.content_length = length
+    resp.status = falcon.HTTP_200
+
+
+def get_latest_file_name():
+    cwd_contents = [os.path.join(capture_path, d) for d in os.listdir(capture_path)]
+    all_subdirs = [d for d in cwd_contents if os.path.isdir(d)]
+    latest_subdir = max(all_subdirs, key=os.path.getmtime)
+    list_of_files = glob.glob(latest_subdir+"/*.tif")
+    latest_file = max(list_of_files, key=os.path.getctime)
+    return latest_file
+
+
+def retrieve_file_image(resp, filename):
+    resp.content_type = "image/tif"
+    stream = open(filename, 'rb')
+    content_length = os.path.getsize(filename)
+    resp.stream, resp.content_length = stream, content_length
+    resp.status = falcon.HTTP_200
+
+
+def retrieve_last_image(resp):
+    retrieve_file_image(resp, get_latest_file_name())
+
+
+def save_image_to_file(camera, resp, filename):
+    camera.save_image_to_file(filename)
+    resp.status = falcon.HTTP_200
+
+
+def save_image_and_send_bytes(camera, resp, filename):
+    image_bytes, length = camera.save_to_file_and_get_imagebytes(filename)
+    resp.content_type = "application/octet-stream"
+    resp.data = image_bytes
+    resp.content_length = length
+    resp.status = falcon.HTTP_200
 
 
 class CameraProcessResource:
@@ -35,12 +80,23 @@ class CameraProcessResource:
         return self._processes[camera_id]
 
     def on_get(self, req: falcon.Request, resp: falcon.Response, camera_id, setting_name):
+        if setting_name == "lastimage":
+            self._handle_lastimage(resp)
+            return
         cam_handle = self._get_camera_handler(camera_id, setting_name, resp)
         if cam_handle is None:
             return
 
         print(f"GET {setting_name}")
         self._process_get(req, resp, cam_handle, setting_name)
+
+    def _handle_lastimage(self, resp: falcon.Response):
+        try:
+            retrieve_last_image(resp)
+        except ValueError as e:
+            resp.text = json.dumps({"error": repr(e), "trace": format_exc()})
+            resp.status = falcon.HTTP_412
+        return
 
     def _check_state(self, handle: CameraProcessHandle, result_queue: Queue):
         print(f"Current state = {handle.state}")
