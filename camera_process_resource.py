@@ -1,10 +1,12 @@
 from .camera_process import CameraProcessHandle, DONE_TOKEN, BUSY_TOKEN
-from .camera_server_utils import CameraCommand, CameraSimpleCommand, get_optional_query_params_for_ascom
+from .camera_server_utils import CameraSimpleGETCommand, CameraSimplePUTCommand, \
+    extract_client_and_transaction_id_for_put, create_ascom_response_dict
 
 import falcon
 import logging
 import json
 from multiprocessing import Queue
+from traceback import format_exc
 
 
 log = logging.getLogger('main')
@@ -14,6 +16,7 @@ class CameraProcessResource:
     def __init__(self, processes, id_generator):
         self._processes = processes
         self._id_generator = id_generator
+
         print(f"Camera processes include: {self._processes}")
         self._capturing = False
 
@@ -35,7 +38,9 @@ class CameraProcessResource:
         cam_handle = self._get_camera_handler(camera_id, setting_name, resp)
         if cam_handle is None:
             return
-        self._process_get(resp, cam_handle, setting_name)
+
+        print(f"GET {setting_name}")
+        self._process_get(req, resp, cam_handle, setting_name)
 
     def _check_state(self, handle: CameraProcessHandle, result_queue: Queue):
         print(f"Current state = {handle.state}")
@@ -66,7 +71,7 @@ class CameraProcessResource:
                 print("Polling failed, we are still busy...")
         return handle.state
 
-    def _process_get(self, resp: falcon.Response, handle: CameraProcessHandle, setting_name: str):
+    def _process_get(self, req: falcon.Request, resp: falcon.Response, handle: CameraProcessHandle, setting_name: str):
         result_queue = handle.result_queue
         current_state = self._check_state(handle, result_queue)
         if "IDLE" != current_state:
@@ -75,24 +80,45 @@ class CameraProcessResource:
             return
         command_queue = handle.command_queue
 
-        command_queue.put(CameraSimpleCommand(setting_name))
-        raw_result = result_queue.get()
-        if not raw_result.ok():
-            resp.text = json.dumps({"Error": raw_result.error()})
-            resp.status = falcon.HTTP_500
+        try:
+            client_id = int(req.params["ClientID"])
+            client_transaction_id = int(req.params["ClientTransactionID"])
+        except Exception as e:
+            log.warning(f"Could not read params: {repr(e)}")
+            resp.text = json.dumps({"error": repr(e), "trace": format_exc()})
+            resp.status = falcon.HTTP_400
             return
+
+        command_queue.put(CameraSimpleGETCommand(setting_name))
+        resp.status = falcon.HTTP_200
+        server_transaction_id = self._id_generator.generate()
+        raw_result = result_queue.get()
+
+        error_msg = ""
+        error_no = 0
+        if not raw_result.ok():
+            error_msg = raw_result.error()
+            error_no = 500
+            resp.status = falcon.HTTP_500
 
         result = raw_result.get()
         print(f"Acquired result: {result}")
         if result == BUSY_TOKEN:
             handle.state = "BUSY"
-        resp.text = json.dumps({"Result": result})
-        resp.status = falcon.HTTP_200
+
+        response_dict = create_ascom_response_dict(client_transaction_id,
+                                                   server_transaction_id,
+                                                   error_number=error_no,
+                                                   error_message=error_msg)
+        response_dict.update({"Value": result})
+
+        resp.text = json.dumps(response_dict)
 
     def on_put(self, req: falcon.Request, resp: falcon.Response, camera_id, setting_name):
         cam_handle = self._get_camera_handler(camera_id, setting_name, resp)
         if cam_handle is None:
             return
+        print(f"PUT {setting_name}")
         self._process_put(req, resp, cam_handle, setting_name)
 
     def _process_put(self, req, resp, cam_handle: CameraProcessHandle, setting_name):
@@ -100,17 +126,39 @@ class CameraProcessResource:
             resp.text = json.dumps({"Status": cam_handle.state})
             resp.status = falcon.HTTP_412
             return
-        form = req.media
-        log.info(f"Send form = {form}")
-        cam_handle.command_queue.put(CameraCommand(name=setting_name, params=form))
-        log.info("Waiting for response")
-        raw_result = cam_handle.result_queue.get()
-        if not raw_result.ok():
-            resp.text = json.dumps({"Error": raw_result.error()})
-            resp.status = falcon.HTTP_500
+
+        try:
+            form = req.media
+            cid, ctid, params = extract_client_and_transaction_id_for_put(req)
+            log.info(f"Send form = {form}")
+        except Exception as e:
+            log.warning(f"Could not read params: {repr(e)}")
+            resp.text = json.dumps({"error": repr(e), "trace": format_exc()})
+            resp.status = falcon.HTTP_400
             return
+
+        cam_handle.command_queue.put(CameraSimplePUTCommand(name=setting_name, params=params))
+        log.info("Waiting for response")
+        server_transaction_id = self._id_generator.generate()
+        raw_result = cam_handle.result_queue.get()
+
+        error_msg = ""
+        error_no = 0
+        resp.status = falcon.HTTP_200
+        if not raw_result.ok():
+            error_msg = raw_result.error()
+            error_no = 500
+            resp.status = falcon.HTTP_500
+
         result = raw_result.get()
+
         if result == BUSY_TOKEN:
             cam_handle.state = "BUSY"
 
-        resp.text = json.dumps({"Result": result})
+        log.info(f"Response = {result}")
+        response_dict = create_ascom_response_dict(ctid,
+                                                   server_transaction_id,
+                                                   error_number=error_no,
+                                                   error_message=error_msg)
+        response_dict.update({"Value": result})
+        resp.text = json.dumps(response_dict)

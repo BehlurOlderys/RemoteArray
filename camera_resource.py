@@ -1,5 +1,5 @@
 import falcon.status_codes
-from .camera_server_utils import get_optional_query_params_for_ascom
+from .camera_server_utils import get_optional_query_params_for_ascom, create_ascom_response_dict
 from .camera_server_utils import check_camera_id
 import json
 import os
@@ -299,14 +299,13 @@ class CameraResource:
         error_number = 0  # TODO!
         error_message = ""  # TODO!
 
-        response_json = {
-          "ClientTransactionID": client_transaction_id,
-          "ServerTransactionID": server_transaction_id,
-          "ErrorNumber": error_number,
-          "ErrorMessage": error_message,
-        }
-        if result is not None:
-            response_json.update(result)
+        response_dict = create_ascom_response_dict(client_transaction_id,
+                                                   server_transaction_id,
+                                                   error_number,
+                                                   error_message)
 
-        resp.text = json.dumps(response_json)
+        if result is not None:
+            response_dict.update(result)
+
+        resp.text = json.dumps(response_dict)
         resp.status = falcon.HTTP_200

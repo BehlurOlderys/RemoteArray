@@ -59,6 +59,7 @@ class ZwoCamera(AscomCamera):
         self._reserve_buffer()
 
     def set_exposure(self, duration_s):
+        duration_s = float(duration_s)
         self._camera.set_control_value(asi.ASI_EXPOSURE, int(duration_s * ONE_SECOND_IN_MICROSECONDS))
         self._last_duration = duration_s
 
@@ -169,6 +170,7 @@ class ZwoCamera(AscomCamera):
         return self._connected
 
     def set_connected(self, value):
+        value = bool(value)
         if self._connected and not value:
             del self._camera
             self._connected = False
@@ -232,6 +234,7 @@ class ZwoCamera(AscomCamera):
         return float(self._camera.get_control_value(asi.ASI_TEMPERATURE)[0]) / 10.0
 
     def set_gain(self, value):
+        value = int(value)
         self._camera.set_control_value(asi.ASI_GAIN, value)
 
     def get_bayeroffsetx(self):
@@ -301,7 +304,7 @@ class ZwoCamera(AscomCamera):
         pass  # TODO!
 
     def get_gain(self):
-        return self._camera.get_control_value(asi.ASI_GAIN)
+        return self._camera.get_control_value(asi.ASI_GAIN)[0]
 
     def get_gainmax(self):
         return self._camera.get_controls()["Gain"]["MaxValue"]
@@ -437,6 +440,7 @@ class ZwoCamera(AscomCamera):
         self._camera.set_roi_format(*whbi)
 
     def set_readoutmode(self, value):
+        value = int(value)
         camera_info = self._camera.get_camera_property()
         supported = camera_info['SupportedVideoFormat']
 
@@ -451,6 +455,7 @@ class ZwoCamera(AscomCamera):
         self._reserve_buffer()
 
     def set_binx(self, value):
+        value = int(value)
         self._set_bins(value)
         self._reserve_buffer()
 
@@ -459,21 +464,25 @@ class ZwoCamera(AscomCamera):
         self._reserve_buffer()
 
     def set_numx(self, value):
+        value = int(value)
         sx, sy, _, h = self._camera.get_roi()
         self._camera.set_roi(sx, sy, value, h)
         self._reserve_buffer()
 
     def set_numy(self, value):
+        value = int(value)
         sx, sy, w, _ = self._camera.get_roi()
         self._camera.set_roi(sx, sy, w, value)
         self._reserve_buffer()
 
     def set_startx(self, value):
+        value = int(value)
         _, sy, w, h = self._camera.get_roi()
         self._camera.set_roi(value, sy, w, h)
         self._reserve_buffer()
 
     def set_starty(self, value):
+        value = int(value)
         sx, _, w, h = self._camera.get_roi()
         self._camera.set_roi(sx, value, w, h)
         self._reserve_buffer()
