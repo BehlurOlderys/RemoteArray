@@ -1,13 +1,10 @@
 from .ascom_camera import AscomCamera, CameraState
 import zwoasi as asi
-import logging
 import numpy as np
 import base64
 import os
 from PIL import Image
-
-
-log = logging.getLogger('main')
+from .app_utils import add_log
 
 
 if os.name == "nt": 
@@ -38,8 +35,15 @@ image_types_by_name = {
 image_types_by_value = {v: k for k, v in image_types_by_name.items()}
 
 
+logs = {}
+
+
 class ZwoCamera(AscomCamera):
     def __init__(self, camera_index):
+        if camera_index not in logs.keys():
+            logs[camera_index] = add_log(f"camera_{camera_index}")
+
+        self._log = logs[camera_index]
         self._state = CameraState.IDLE
         self._camera = asi.Camera(camera_index)
         self._index = camera_index
@@ -52,7 +56,7 @@ class ZwoCamera(AscomCamera):
         self._connected = True
         self._new_filename = None
         self._last_duration = 1
-        log.info(f"ROI FORMAT = {self._camera.get_roi_format()}")
+        self._log.info(f"ROI FORMAT = {self._camera.get_roi_format()}")
 
         self._buffer = None
         self._buffer_size = 0
@@ -78,7 +82,7 @@ class ZwoCamera(AscomCamera):
             sz *= 3
         elif whbi[3] == asi.ASI_IMG_RAW16:
             sz *= 2
-        log.info(f"Reserving buffer of size {whbi[0]}x{whbi[1]}={sz}")
+        self._log.info(f"Reserving buffer of size {whbi[0]}x{whbi[1]}={sz}")
 
         if self._buffer is None:
             self._buffer_size = sz
@@ -122,7 +126,7 @@ class ZwoCamera(AscomCamera):
             mode = 'I;16'
         image = Image.fromarray(img, mode=mode)
         image.save(filename)
-        log.debug('wrote %s', filename)
+        self._log.debug('wrote %s', filename)
 
     def save_to_file_and_get_imagebytes(self, filename):
         self.save_image_to_file(filename)
@@ -496,9 +500,11 @@ class ZwoCamera(AscomCamera):
     def stoptexposure(self):
         self._camera.stop_exposure()
 
-    def startexposure(self, duration: float, light=True, save=False):
-        log.info(f"Starting exposure: {duration}s")
+    def startexposure(self, duration, light=True, save=False):
+        duration = float(duration)
+        exposure_us = int(duration * ONE_SECOND_IN_MICROSECONDS)
+        self._log.info(f"Starting exposure: {exposure_us}us")
         if self._last_duration != duration:
             self._last_duration = duration
-            self._camera.set_control_value(asi.ASI_EXPOSURE, int(duration * ONE_SECOND_IN_MICROSECONDS))
+            self._camera.set_control_value(asi.ASI_EXPOSURE, exposure_us)
         self._camera.start_exposure(is_dark=not light)

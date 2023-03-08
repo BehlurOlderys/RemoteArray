@@ -238,7 +238,7 @@ class CameraProcessor:
             self._response_queue.put(Error("Failed to initialize"))
 
     def _handle_set_startexposure(self, params):
-        duration = int(params["Duration"])
+        duration = float(params["Duration"])
         light = bool(params["Light"])
         self._camera.startexposure(duration=duration, light=light)
         self._response_queue.put(OK(DONE_TOKEN))
