@@ -270,7 +270,7 @@ class CameraProcessor:
             print(f"Capturing file {i}")
             fn = self._filename_generator.generate()
             self._camera.capture(fn)
-            self._response_queue.put(OK(f"{i}/{number}"))
+            self._response_queue.put(OK(f"{i+1}/{number}"))
 
         print(f"Capturing done! It took {time.time() - ss} s")
         self._response_queue.put(OK(DONE_TOKEN))
