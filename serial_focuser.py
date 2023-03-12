@@ -52,6 +52,8 @@ def send_command_and_get_response(ser, command):
 
     ser.write(command)
     message = ser.readline().decode('UTF-8').rstrip()
+    if message.startswith("ERROR"):
+        raise SerialException(f"Serial device returned error: {message}!")
     return message
 
 
@@ -68,11 +70,11 @@ class SerialFocuser(AscomFocuser):
     def _create_command(self, command, argument=None):
         """
         example:
-        MOVE@1=23\n
-        GET_NAME@3=0\n
+        MOVE 1 23\n
+        GET_NAME 3 0\n
         """
         argument_str = f"{str(argument)}" if command == "MOVE" else "0"
-        return f"{command}@{self._index}={argument_str}\n".encode()
+        return f"{command} {self._index} {argument_str}\n".encode()
 
     def get_absolute(self):
         return False
@@ -99,7 +101,10 @@ class SerialFocuser(AscomFocuser):
         return False
 
     def get_temperature(self):
-        return float(send_command_and_get_response(self._ser, "GET_TEMP"))
+        """
+        should obtain value in one/tenths of Celsius degree.
+        """
+        return float(send_command_and_get_response(self._ser, "GET_TEMP")) / 10.0
 
     def put_tempcomp(self, value):
         pass  # Does nothing
