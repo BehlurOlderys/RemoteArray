@@ -1,6 +1,7 @@
 from .camera_process import CameraProcessHandle, DONE_TOKEN, BUSY_TOKEN
 from .camera_server_utils import CameraSimpleGETCommand, CameraSimplePUTCommand, \
     extract_client_and_transaction_id_for_put, create_ascom_response_dict
+from .utils import add_timestamp_before, add_timestamp_after
 
 import falcon
 import logging
@@ -56,6 +57,14 @@ class CameraProcessResource:
 
         print(f"Camera processes include: {self._processes}")
         self._capturing = False
+        self._last_timestamp = None
+
+    def set_timestamp(self, t):
+        self._last_timestamp = t
+
+    def get_timestamp(self):
+        return self._last_timestamp
+
 
     def _get_camera_handler(self, camera_id, setting_name, resp):
         try:
@@ -71,6 +80,8 @@ class CameraProcessResource:
             return None
         return self._processes[camera_id]
 
+    @falcon.before(add_timestamp_before)
+    @falcon.after(add_timestamp_after)
     def on_get(self, req: falcon.Request, resp: falcon.Response, camera_id, setting_name):
         print(f"GET {setting_name}")
         if setting_name == "lastimage":
@@ -180,6 +191,8 @@ class CameraProcessResource:
 
         resp.text = json.dumps(response_dict)
 
+    @falcon.before(add_timestamp_before)
+    @falcon.after(add_timestamp_after)
     def on_put(self, req: falcon.Request, resp: falcon.Response, camera_id, setting_name):
         cam_handle = self._get_camera_handler(camera_id, setting_name, resp)
         if cam_handle is None:
