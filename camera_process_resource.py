@@ -65,7 +65,6 @@ class CameraProcessResource:
     def get_timestamp(self):
         return self._last_timestamp
 
-
     def _get_camera_handler(self, camera_id, setting_name, resp):
         try:
             camera_id = int(camera_id)
@@ -93,6 +92,8 @@ class CameraProcessResource:
 
         if setting_name == "imagebytes":
             self._handle_imagebytes(resp, cam_handle)
+        elif setting_name == "currentimage":
+            self._handle_currentimage(resp, cam_handle)
         else:
             self._process_get(req, resp, cam_handle, setting_name)
 
@@ -104,20 +105,34 @@ class CameraProcessResource:
             resp.status = falcon.HTTP_412
         return
 
-    def _handle_imagebytes(self, resp: falcon.Response, cam_handle: CameraProcessHandle):
-        cam_handle.command_queue.put(CameraSimpleGETCommand("imagebytes"))
+    def _return_image_common(self, resp: falcon.Response, cam_handle: CameraProcessHandle):
         raw_result = cam_handle.result_queue.get()
         if not raw_result.ok():
+            log.error(f"Error in result from process: {raw_result.error()}")
             resp.status = falcon.HTTP_500
             resp.text = raw_result.error()
             return
 
+        if raw_result.get() == BUSY_TOKEN:
+            resp.status = falcon.HTTP_418
+            resp.text = "Busy..."
+            return
+
+        log.info("Successful processing of imaging request!")
         data = cam_handle.data_pipe.recv()
         imagebytes, length = data
         resp.content_type = "application/octet-stream"
         resp.data = imagebytes
         resp.content_length = length
         resp.status = falcon.HTTP_200
+
+    def _handle_imagebytes(self, resp: falcon.Response, cam_handle: CameraProcessHandle):
+        cam_handle.command_queue.put(CameraSimpleGETCommand("imagebytes"))
+        self._return_image_common(resp, cam_handle)
+
+    def _handle_currentimage(self, resp: falcon.Response, cam_handle: CameraProcessHandle):
+        cam_handle.command_queue.put(CameraSimpleGETCommand("currentimage"))
+        self._return_image_common(resp, cam_handle)
 
     def _check_state(self, handle: CameraProcessHandle, result_queue: Queue):
         print(f"Current state = {handle.state}")
@@ -219,8 +234,12 @@ class CameraProcessResource:
         cam_handle.command_queue.put(CameraSimplePUTCommand(name=setting_name, params=params))
         log.info("Waiting for response")
         server_transaction_id = self._id_generator.generate()
-        raw_result = cam_handle.result_queue.get()
 
+        if setting_name == "instantcapture":
+            self._return_image_common(resp, cam_handle)
+            return
+
+        raw_result = cam_handle.result_queue.get()
         error_msg = ""
         error_no = 0
         resp.status = falcon.HTTP_200

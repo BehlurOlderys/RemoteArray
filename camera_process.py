@@ -83,14 +83,6 @@ regular_get_methods = [
     "heatsinktemperature"
 ]
 
-unusual_get_methods = [
-    "list",
-    "imageready",
-    "imagebytes",
-    "saveimageandsendbytes",
-    "saveimage"
-]
-
 regular_put_methods = [
     "gain",
     "connected",
@@ -103,15 +95,6 @@ regular_put_methods = [
     "starty"
 ]
 
-unusual_put_methods = [
-    "init",
-    "capture",
-    "startexposure",
-    "stopexposure",
-    "abortexposure"
-]
-
-
 class CameraProcessor:
     def __init__(self, info: CameraProcessInfo):
         self._filename_generator = DefaultCaptureFilenameGenerator(prefix="")
@@ -121,15 +104,42 @@ class CameraProcessor:
         self._command_queue = info.in_queue
         self._kill_event = info.kill_event
         self._data_pipe = info.data_pipe
+        self._continuous = False
         ZwoCamera.initialize_library()
         self._camera: ZwoCamera = None
         log.info(f"Starting process for camera no {info.camera_id}")
 
+        self._unusual_put_method_map = {
+            "init": self._handle_set_init,
+            "startexposure": self._handle_set_startexposure,
+            "capture": self._handle_set_capture,
+            "instantcapture": self._handle_instant_capture,
+            "startcontinuous": self._handle_start_continuous,
+            "stopcontinuous": self._handle_stop_continuous
+        }
+
+        self._unusual_get_method_map = {
+            "list": self._handle_get_list,
+            "imageready": self._handle_get_imageready,
+            "imagebytes": self._handle_get_imagebytes,
+            "currentimage": self._get_current_image
+        }
+
     def run(self):
         while not self._kill_event.is_set():
+            possible_when_continuous = [
+                "stopcontinuous",
+                "currentimage"
+            ]
+
             command_raw: CameraCommand = self._command_queue.get()
             if command_raw is None:
                 break  # this is ultimate stopping condition
+
+            if self._continuous and command_raw.get_name() not in possible_when_continuous:
+                self._response_queue.put(Error(f"Not allowed when in continuous mode!"))
+                continue
+
             if command_raw.is_get():
                 self._handle_get(command_raw)
 
@@ -140,7 +150,7 @@ class CameraProcessor:
         command_name = command_raw.get_name()
         if command_name in regular_get_methods:
             self._handle_regular_get(command_name)
-        elif command_name in unusual_get_methods:
+        elif command_name in self._unusual_get_method_map.keys():
             self._handle_unusual_get(command_raw)
         else:
             self._response_queue.put(Error(f"Unknown get command: {command_name}"))
@@ -156,15 +166,8 @@ class CameraProcessor:
         self._response_queue.put(OK(result))
 
     def _handle_unusual_get(self, command_raw):
-        command_name = command_raw.get_name()
-        if command_name == "list":
-            self._handle_get_list()
-        elif command_name == "imageready":
-            self._handle_get_imageready()
-        elif command_name == "imagebytes":
-            self._handle_get_imagebytes()
-        else:
-            self._response_queue.put(Error(f"Unimplemented GET: {command_name}"))
+        handle_for_get = self._unusual_get_method_map[command_raw.get_name()]
+        handle_for_get()
 
     def _handle_get_list(self):
         self._response_queue.put(OK(ZwoCamera.get_cameras_list()))
@@ -187,7 +190,7 @@ class CameraProcessor:
         params = command_raw.get_params()
         if command_name in regular_put_methods:
             self._handle_regular_put(command_name, params)
-        elif command_name in unusual_put_methods:
+        elif command_name in self._unusual_put_method_map.keys():
             self._handle_unusual_put(command_name, params)
         else:
             self._response_queue.put(Error(f"Unknown put command: {command_name}"))
@@ -218,14 +221,53 @@ class CameraProcessor:
             self._response_queue.put(Error("Unknown exception: " + repr(e)))
 
     def _handle_unusual_put(self, command_name, params):
-        if command_name == "init":
-            self._handle_set_init(params)
-        elif command_name == "startexposure":
-            self._handle_set_startexposure(params)
-        elif command_name == "capture":
-            self._handle_set_capture(params)
-        else:
-            self._response_queue.put(Error(f"Unimplemented PUT: {command_name}"))
+        mapped_handle = self._unusual_put_method_map[command_name]
+        mapped_handle(params)
+
+    def _handle_start_continuous(self, params):
+        log.debug("Starting continuous imaging!")
+        self._continuous = True
+        self._response_queue.put(OK(DONE_TOKEN))
+        self._camera.startexposure(duration=1.0, light=True)
+
+    def _handle_stop_continuous(self, params):
+        log.debug("Starting continuous imaging!")
+        self._continuous = False
+        self._response_queue.put(OK(DONE_TOKEN))
+
+    def _get_current_image(self):
+        if not self._camera.get_imageready():
+            self._response_queue.put(OK(BUSY_TOKEN))
+            return
+
+        imagebytes, length = self._camera.get_imagebytes()
+        self._response_queue.put(OK(DONE_TOKEN))
+        self._data_pipe.send((imagebytes, length))
+        self._camera.startexposure(duration=1.0, light=True)
+
+    def _handle_instant_capture(self, params):
+        log.debug("Starting instant capture!")
+        max_instant_capture_duration_s = 5
+        instant_capture_wait_increment_s = 0.1
+        instant_capture_max_counter = 10 + int(max_instant_capture_duration_s/instant_capture_wait_increment_s)
+        duration = float(params["Duration"])
+        light = bool(params["Light"])
+        if duration > max_instant_capture_duration_s:
+            self._response_queue.put(
+                Error(f"Duration too long: allowed = {max_instant_capture_duration_s} "
+                      f"while requested {duration}"))
+            return
+        self._camera.startexposure(duration=duration, light=light)
+        for i in range(0, instant_capture_max_counter):
+            if self._camera.get_imageready():
+                imagebytes, length = self._camera.get_imagebytes()
+                self._response_queue.put(OK(DONE_TOKEN))
+                self._data_pipe.send((imagebytes, length))
+                return
+            time.sleep(instant_capture_wait_increment_s)
+        self._response_queue.put(
+            Error(f"Timeout: Could not get instant image on time!"))
+        return
 
     def _handle_set_init(self, params):
         if self._camera is not None:
