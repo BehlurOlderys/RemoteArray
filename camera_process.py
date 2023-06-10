@@ -128,6 +128,7 @@ class CameraProcessor:
     def run(self):
         while not self._kill_event.is_set():
             possible_when_continuous = [
+                "init",
                 "stopcontinuous",
                 "currentimage"
             ]
@@ -242,8 +243,8 @@ class CameraProcessor:
 
         imagebytes, length = self._camera.get_imagebytes()
         self._response_queue.put(OK(DONE_TOKEN))
-        self._data_pipe.send((imagebytes, length))
         self._camera.startexposure(duration=1.0, light=True)
+        self._data_pipe.send((imagebytes, length))
 
     def _handle_instant_capture(self, params):
         log.debug("Starting instant capture!")
@@ -271,8 +272,7 @@ class CameraProcessor:
 
     def _handle_set_init(self, params):
         if self._camera is not None:
-            self._response_queue.put(OK("Already initialized"))
-            return
+            del self._camera
         self._camera = ZwoCamera(camera_index=self._camera_id)
         if self._camera is not None:
             self._response_queue.put(OK("Done init"))

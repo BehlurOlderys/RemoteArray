@@ -89,6 +89,6 @@ class AscomFocuser(AscomDevice):
         Moves the focuser by the specified amount or to the specified position
         depending on the value of the Absolute property.
         value: Position
-Step    distance or absolute position, depending on the value of the Absolute property
+        distance or absolute position, depending on the value of the Absolute property
         """
         pass

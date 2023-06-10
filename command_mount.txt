@@ -1,0 +1,1 @@
+waitress-serve --port=8080 samyang_app.app_mount:app

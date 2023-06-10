@@ -7,7 +7,7 @@
 7. git clone https://github.com/BehlurOlderys/RemoteArray.git
 8. mkdir samyang_app; mv RemoteArray samyang_app/samyang_app
 9. cd samyang_app; python3 -m venv .venv
-10. pip install falcon, pillow, zwoasi
+10. pip install falcon pillow zwoasi waitress
 11. scp asi_sdk
 12. tar -xf asi_sdk
 13. 
