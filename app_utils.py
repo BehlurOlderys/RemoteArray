@@ -24,21 +24,16 @@ class DefaultCaptureFilenameGenerator:
         current_day = datetime.now().strftime("%Y-%m-%d")
         new_dir = os.path.join(os.getcwd(), "capture", current_day)
 
-        if self._last_dir is None:
+        if self._last_dir is None or (self._last_dir != new_dir):
             self._last_dir = new_dir
             if not os.path.isdir(self._last_dir):
                 os.makedirs(self._last_dir)
-
-        elif self._last_dir != new_dir:
-            os.makedirs(os.path.join(os.getcwd(), self._last_dir))
-            self._last_dir = new_dir
 
         dt_string = datetime.now().strftime("_%Y%m%d_%H%M%S")
         fn = self._prefix + dt_string + "_Capture_{0:05d}.tif".format(self._number)
         fp = os.path.join(self._last_dir, fn)
         self._number += 1
         return fp
-
 
 
 class DefaultServerTransactionIDGenerator:
