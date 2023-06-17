@@ -272,11 +272,10 @@ class CameraProcessor:
 
     def _handle_set_init(self, params):
         if self._camera is not None:
-            del self._camera
-        self._camera = ZwoCamera(camera_index=self._camera_id)
-        if self._camera is not None:
             self._response_queue.put(OK("Done init"))
+            self._continuous = False
         else:
+            self._camera = ZwoCamera(camera_index=self._camera_id)
             self._response_queue.put(Error("Failed to initialize"))
 
     def _handle_set_startexposure(self, params):

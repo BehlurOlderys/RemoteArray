@@ -12,4 +12,4 @@ pip install -r samyang_app/requirements.txt
 # something about zwo libs
 mv samyang_app/on_boot.sh .
 chmod +x on_boot.sh
-(sudo crontab -l ; cat samyang_app/crontab_line.txt)| sudo crontab -
+(sudo crontab -l ; cat samyang_app/crontab_line_mount.txt)| sudo crontab -
