@@ -307,15 +307,16 @@ class CameraProcessor:
 
         self._camera.set_exposure(duration_s)
         ss = time.time()
-        for i in range(0, number):
-            print(f"Capturing file {i}")
-            fn = self._filename_generator.generate()
-            self._camera.capture(fn)
-            self._response_queue.put(OK(f"{i+1}/{number}"))
-
-        print(f"Capturing done! It took {time.time() - ss} s")
-        self._response_queue.put(OK(DONE_TOKEN))
-        self._capturing = False
+        try:
+            for i in range(0, number):
+                print(f"Capturing file {i}")
+                fn = self._filename_generator.generate()
+                self._camera.capture(fn)
+                self._response_queue.put(OK(f"{i+1}/{number}"))
+        finally:
+            print(f"Capturing done! It took {time.time() - ss} s")
+            self._response_queue.put(OK(DONE_TOKEN))
+            self._capturing = False
 
 
 def camera_process(info: CameraProcessInfo):

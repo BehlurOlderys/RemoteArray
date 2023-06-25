@@ -2,9 +2,10 @@
 2. pi: pi
 3. passwd
 3.1 to change name and static IP: vim /etc/network/interfaces.d/eth0
-3.2 sudo apt install resolvconf
-3.3 vim sudo vim /etc/resolvconf/resolv.conf.d/base
-3.4 add 'nameserver 8.8.8.8'
+3.2 put also dns-nameservers 8.8.8.8 in there
+3.3 sudo apt install resolvconf
+3.4 sudo vim /etc/resolvconf/resolv.conf.d/base
+3.5 add 'nameserver 8.8.8.8'
 4. sudo apt-get update
 5. sudo apt-get install python3-venv
 6. mkdir workspace
