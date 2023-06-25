@@ -138,7 +138,7 @@ class CameraProcessResource:
         print(f"Current state = {handle.state}")
         if handle.state == "IDLE":
             print("Camera process idle")
-            return handle.state
+            return handle.state, ""
         if handle.state == "BUSY":
             print("Camera process WAS busy, polling...")
 
@@ -151,23 +151,25 @@ class CameraProcessResource:
                 if status_raw.ok():
                     status = status_raw.get()
                 else:
+                    err_msg = status_raw.error()
+                    print(f"Error encountered: {err_msg}")
                     handle.state = "ERROR"
-                    return handle.state
+                    return handle.state, err_msg
                 print(f"Received status: {status}")
                 if status == DONE_TOKEN:
                     handle.state = "IDLE"
-                    return status
+                    return status, ""
                 else:
-                    return status
+                    return status, "Camera seems to be busy capturing"
             else:
                 print("Polling failed, we are still busy...")
-        return handle.state
+        return handle.state, "Quite unexpected"
 
     def _process_get(self, req: falcon.Request, resp: falcon.Response, handle: CameraProcessHandle, setting_name: str):
         result_queue = handle.result_queue
-        current_state = self._check_state(handle, result_queue)
+        current_state, err_msg = self._check_state(handle, result_queue)
         if "IDLE" != current_state:
-            resp.text = json.dumps({"Status": current_state})
+            resp.text = json.dumps({"Status": current_state, "ErrorMessage": err_msg})
             resp.status = falcon.HTTP_412
             return
         command_queue = handle.command_queue
@@ -216,8 +218,9 @@ class CameraProcessResource:
         self._process_put(req, resp, cam_handle, setting_name)
 
     def _process_put(self, req, resp, cam_handle: CameraProcessHandle, setting_name):
-        if "IDLE" != self._check_state(cam_handle, cam_handle.result_queue):
-            resp.text = json.dumps({"Status": cam_handle.state})
+        state, err_msg = self._check_state(cam_handle, cam_handle.result_queue)
+        if "IDLE" != state:
+            resp.text = json.dumps({"Status": cam_handle.state, "ErrorMessage": err_msg})
             resp.status = falcon.HTTP_412
             return
 
