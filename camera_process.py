@@ -313,10 +313,14 @@ class CameraProcessor:
                 fn = self._filename_generator.generate()
                 self._camera.capture(fn)
                 self._response_queue.put(OK(f"{i+1}/{number}"))
-        finally:
-            print(f"Capturing done! It took {time.time() - ss} s")
-            self._response_queue.put(OK(DONE_TOKEN))
+        except PermissionError as pe:
+            self._response_queue.put(Error("Permissions problems! Try running with sudo"))
             self._capturing = False
+            return
+
+        print(f"Capturing done! It took {time.time() - ss} s")
+        self._response_queue.put(OK(DONE_TOKEN))
+        self._capturing = False
 
 
 def camera_process(info: CameraProcessInfo):
