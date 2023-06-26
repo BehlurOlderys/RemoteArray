@@ -95,6 +95,7 @@ regular_put_methods = [
     "starty"
 ]
 
+
 class CameraProcessor:
     def __init__(self, info: CameraProcessInfo):
         self._filename_generator = DefaultCaptureFilenameGenerator(prefix="")
@@ -105,6 +106,7 @@ class CameraProcessor:
         self._kill_event = info.kill_event
         self._data_pipe = info.data_pipe
         self._continuous = False
+        self._continuous_exp = 1
         ZwoCamera.initialize_library()
         self._camera: ZwoCamera = None
         log.info(f"Starting process for camera no {info.camera_id}")
@@ -230,6 +232,7 @@ class CameraProcessor:
         self._continuous = True
         self._response_queue.put(OK(DONE_TOKEN))
         duration = float(params["Exposure"])
+        self._continuous_exp = duration
         self._camera.startexposure(duration=duration, light=True)
 
     def _handle_stop_continuous(self, params):
@@ -244,7 +247,7 @@ class CameraProcessor:
 
         imagebytes, length = self._camera.get_imagebytes()
         self._response_queue.put(OK(DONE_TOKEN))
-        self._camera.startexposure(duration=1.0, light=True)
+        self._camera.startexposure(duration=self._continuous_exp, light=True)
         self._data_pipe.send((imagebytes, length))
 
     def _handle_instant_capture(self, params):
