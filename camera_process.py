@@ -229,7 +229,8 @@ class CameraProcessor:
         log.debug("Starting continuous imaging!")
         self._continuous = True
         self._response_queue.put(OK(DONE_TOKEN))
-        self._camera.startexposure(duration=1.0, light=True)
+        duration = float(params["Exposure"])
+        self._camera.startexposure(duration=duration, light=True)
 
     def _handle_stop_continuous(self, params):
         log.debug("Starting continuous imaging!")
