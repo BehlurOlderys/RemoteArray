@@ -32,7 +32,7 @@ class MountResource:
     @falcon.after(add_timestamp_after)
     def on_get(self, req: falcon.Request, resp: falcon.Response, command_name):
         if command_name == "status":
-            if not self._check_for_serial_error():
+            if not self._check_for_serial_error(resp):
                 return
             resp.text = json.dumps({"Status": "OK"})
             resp.status = falcon.HTTP_200
@@ -54,14 +54,14 @@ class MountResource:
             resp.status = falcon.HTTP_400
             return
         if command_name == "move_ra":
-            if not self._check_for_serial_error():
+            if not self._check_for_serial_error(resp):
                 return
             arcseconds = int(value)
             self._serial.send_line(f"MOVE_RA_AS {arcseconds}")
             resp.status = falcon.HTTP_200
             return
         if command_name == "move_dec":
-            if not self._check_for_serial_error():
+            if not self._check_for_serial_error(resp):
                 return
             arcseconds = int(value)
             self._serial.send_line(f"MOVE_DEC_AS {arcseconds}")
