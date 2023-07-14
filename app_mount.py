@@ -11,8 +11,8 @@ app = application = falcon.App()
 
 
 server_transaction_id_generator = DefaultServerTransactionIDGenerator()
-first_port = get_available_com_ports()[0]
-mount_resource = MountResource(SerialWriter(first_port))
+usb_ports = [p for p in get_available_com_ports() if "USB" in p]
+mount_resource = MountResource(SerialWriter(usb_ports))
 app.add_route("/mount/custom_command/{command_name}", mount_resource)
-app.add_route("/api/v1/status", MountStatusResource(get_available_com_ports()))
+app.add_route("/api/v1/status", MountStatusResource(usb_ports))
 # app.add_route("/api/v1/camera/{camera_id}/{setting_name}", camera_resource)

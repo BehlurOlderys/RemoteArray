@@ -6,8 +6,19 @@ log = logging.getLogger(__name__)
 
 
 class SerialWriter:
-    def __init__(self, port, baud=115200, timeout=0.25):
-        self._serial = Serial(port=port, baudrate=baud, timeout=timeout)
+    def __init__(self, ports, baud=115200, timeout=0.25):
+        self._error_msg = ""
+        self._serial = None
+        if len(ports) > 0:
+            self._serial = Serial(port=ports[0], baudrate=baud, timeout=timeout)
+        else:
+            self._error_msg = "No USB ports available!"
+
+    def get_error(self):
+        return self._serial is None
+
+    def get_error_msg(self):
+        return self._error_msg
 
     def receive_line(self):
         try:

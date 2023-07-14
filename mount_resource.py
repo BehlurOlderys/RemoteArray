@@ -20,17 +20,24 @@ class MountResource:
     def get_timestamp(self):
         return self._last_timestamp
 
-    def _set_serial(self, serial):
-        self._serial = serial
+    def _check_for_serial_error(self, resp):
+        if self._serial.get_error():
+            resp.text = json.dumps(
+                {"Status": "Error", "Message": self._serial.get_error_msg()})
+            resp.status = falcon.HTTP_500
+            return False
+        return True
 
     @falcon.before(add_timestamp_before)
     @falcon.after(add_timestamp_after)
     def on_get(self, req: falcon.Request, resp: falcon.Response, command_name):
-        if command_name == "list_ports":
-            ports = get_available_com_ports
-            resp.text = json.dumps({"ports": ports})
+        if command_name == "status":
+            if not self._check_for_serial_error():
+                return
+            resp.text = json.dumps({"Status": "OK"})
             resp.status = falcon.HTTP_200
             return
+
         resp.status = falcon.HTTP_501
 
     @falcon.before(add_timestamp_before)
@@ -46,16 +53,16 @@ class MountResource:
             resp.text = json.dumps({"error": repr(e), "trace": format_exc()})
             resp.status = falcon.HTTP_400
             return
-        if command_name == "set_serial":
-            self._set_serial(SerialWriter(port=value))
-            resp.status = falcon.HTTP_200
-            return
         if command_name == "move_ra":
+            if not self._check_for_serial_error():
+                return
             arcseconds = int(value)
             self._serial.send_line(f"MOVE_RA_AS {arcseconds}")
             resp.status = falcon.HTTP_200
             return
         if command_name == "move_dec":
+            if not self._check_for_serial_error():
+                return
             arcseconds = int(value)
             self._serial.send_line(f"MOVE_DEC_AS {arcseconds}")
             resp.status = falcon.HTTP_200
