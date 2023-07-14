@@ -41,8 +41,8 @@ class FocuserResource:
 
     @falcon.before(add_timestamp_before)
     @falcon.after(add_timestamp_after)
-    def on_get(self, req: falcon.Request, resp: falcon.Response, device_no, command_name):
-        focuser_number = int(device_no)
+    def on_get(self, req: falcon.Request, resp: falcon.Response, device_number, command_name):
+        focuser_number = int(device_number)
         if not self._check_right_focuser_number(focuser_number, resp):
             return
 
@@ -57,12 +57,12 @@ class FocuserResource:
 
     @falcon.before(add_timestamp_before)
     @falcon.after(add_timestamp_after)
-    def on_put(self, req: falcon.Request, resp: falcon.Response, device_no, command_name):
+    def on_put(self, req: falcon.Request, resp: falcon.Response, device_number, command_name):
         log.debug(f"PUT {command_name}")
         form = req.media
         log.info(f"Send form = {form}")
 
-        focuser_number = int(device_no)
+        focuser_number = int(device_number)
         if not self._check_right_focuser_number(focuser_number, resp):
             return
         try:
