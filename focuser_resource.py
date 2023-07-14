@@ -76,7 +76,9 @@ class FocuserResource:
             if not self._check_for_serial_error(resp):
                 return
             steps = int(value)
-            self._serial.send_line(f"F{focuser_number+1}REL {steps}")
+            command_line = f"F{focuser_number+1}REL {steps}"
+            self._serial.send_line(command_line)
+            resp.text = json.dumps({"Status": "OK", "Command send": command_line})
             resp.status = falcon.HTTP_200
             return
         resp.status = falcon.HTTP_501
