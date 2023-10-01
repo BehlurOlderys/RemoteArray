@@ -48,19 +48,102 @@ class ZwoCamera(AscomCamera):
         self._camera = asi.Camera(camera_index)
         self._index = camera_index
         # self._camera.set_control_value(asi.ASI_HIGH_SPEED_MODE, 0)
-        self._camera.set_control_value(asi.ASI_BANDWIDTHOVERLOAD, 40)
-        self._camera.set_control_value(asi.ASI_GAIN, 17)
-        self._camera.set_control_value(asi.ASI_EXPOSURE, 1 * ONE_SECOND_IN_MICROSECONDS)
-        supported = self._camera.get_camera_property()['SupportedVideoFormat']
-        self._camera.set_image_type(supported[0])
+        # self._camera.set_control_value(asi.ASI_BANDWIDTHOVERLOAD, 40)
+        # self._camera.set_control_value(asi.ASI_GAIN, 17)
+        # self._camera.set_control_value(asi.ASI_EXPOSURE, 1 * ONE_SECOND_IN_MICROSECONDS)
+        # supported = self._camera.get_camera_property()['SupportedVideoFormat']
+        # self._camera.set_image_type(supported[0])
         self._connected = True
         self._new_filename = None
         self._last_duration = 1
+        print(f"ROI FORMAT = {self._camera.get_roi_format()}")
         self._log.info(f"ROI FORMAT = {self._camera.get_roi_format()}")
 
         self._buffer = None
         self._buffer_size = 0
         self._reserve_buffer()
+
+    def set_defaults():
+        self._camera.set_control_value(asi.ASI_HIGH_SPEED_MODE, 0)
+        self._camera.set_control_value(asi.ASI_BANDWIDTHOVERLOAD, self._camera.get_controls()['BandWidth']['MinValue'])
+        self._camera.disable_dark_subtract()
+        self._camera.set_control_value(asi.ASI_GAIN, 150)
+        self._camera.set_control_value(asi.ASI_EXPOSURE, ONE_SECOND_IN_MICROSECONDS)
+        self._camera.set_control_value(asi.ASI_WB_B, 99)
+        self._camera.set_control_value(asi.ASI_WB_R, 75)
+        self._camera.set_control_value(asi.ASI_GAMMA, 50)
+        self._camera.set_control_value(asi.ASI_BRIGHTNESS, 50)
+        self._camera.set_control_value(asi.ASI_FLIP, 0)
+        try: 
+            self._camera.stop_video_capture()
+            self._camera.stop_exposure()
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except:
+            pass
+        self._camera.set_image_type(asi.ASI_IMG_RAW16)
+
+    def get_setting(self, setting_name):
+        allowed_settings = [
+                "gain",
+                "exposure",
+                "ccdtemperature"
+        ]
+        if setting_name in allowed_settings:
+            return True, getattr(self, "get_"+setting_name)()
+        return False, {"allowed_settings": allowed_settings}
+
+    def demo(self):
+        camera_info = self._camera.get_camera_property()
+
+        # Get all of the camera controls
+        print('Camera controls:')
+        controls = self._camera.get_controls()
+        for cn in sorted(controls.keys()):
+            print('    %s:' % cn)
+            for k in sorted(controls[cn].keys()):
+                print('        %s: %s' % (k, repr(controls[cn][k])))
+
+
+        # Use minimum USB bandwidth permitted
+        self._camera.set_control_value(asi.ASI_BANDWIDTHOVERLOAD, self._camera.get_controls()['BandWidth']['MinValue'])
+
+        # Set some sensible defaults. They will need adjusting depending upon
+        # the sensitivity, lens and lighting conditions used.
+        self._camera.disable_dark_subtract()
+
+        self._camera.set_control_value(asi.ASI_GAIN, 150)
+        self._camera.set_control_value(asi.ASI_EXPOSURE, 30000)
+        self._camera.set_control_value(asi.ASI_WB_B, 99)
+        self._camera.set_control_value(asi.ASI_WB_R, 75)
+        self._camera.set_control_value(asi.ASI_GAMMA, 50)
+        self._camera.set_control_value(asi.ASI_BRIGHTNESS, 50)
+        self._camera.set_control_value(asi.ASI_FLIP, 0)
+
+
+        print('Enabling stills mode')
+        try:
+            # Force any single exposure to be halted
+            self._camera.stop_video_capture()
+            self._camera.stop_exposure()
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except:
+            pass
+
+        print('Capturing a single 8-bit mono image')
+        filename = 'image_mono.jpg'
+        self._camera.set_image_type(asi.ASI_IMG_RAW8)
+        try:
+            self._camera.capture(filename=filename)
+            return True
+        except asi.ZWO_CaptureError as ce:
+            print(f"error = {ce}, status = {ce.exposure_status}")
+            return False
+
+    def get_exposure(self):
+        return self._camera.get_control_value(asi.ASI_EXPOSURE)[0]
+
 
     def set_exposure(self, duration_s):
         duration_s = float(duration_s)

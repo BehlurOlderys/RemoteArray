@@ -1,6 +1,6 @@
 from typing import Union
-
-from fastapi import FastAPI
+import time
+from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse
 
 from guiding_app.camera.zwo_camera import ZwoCamera
@@ -16,10 +16,13 @@ ZwoCamera.initialize_library()
 app = FastAPI()
 camera = None
 
-
-@app.get("/")
-def read_root():
-    return {"Hello": "World"}
+@app.middleware("http")
+async def add_process_time_header(request: Request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+    process_time = time.time() - start_time
+    response.headers["X-Process-Time"] = str(process_time)
+    return response
 
 
 @app.get("/items/{item_id}")
@@ -45,4 +48,27 @@ def init_camera(data: CameraName):
     camera = ZwoCamera(camera_index)
     print(f"Initialized camera {data.name} with index {camera_index}")
     return data
+
+@app.get('/camera/{camera_id}/demo')
+def demo_camera(camera_id: int):
+    if camera.demo():
+        return FileResponse("image_mono.jpg")
+    return {"error": "capture failed!"}
+
+@app.get('/camera/{camera_id}/set_defaults')
+def set_camera_defaults(camera_id: int):
+    camera.set_defaults()
+
+@app.get('/camera/{camera_id}/get_{setting}')
+def get_camera_gain(camera_id: int, setting: str):
+    is_success, value = camera.get_setting(setting)
+    if is_success:
+        return {"value": value}
+    return {"error": value}
+
+
+@app.get('/camera/{camera_id}/test')
+def test_capture(camera_id: int):
+    camera.capture("test.jpg")
+    return FileResponse("test.jpg")
 

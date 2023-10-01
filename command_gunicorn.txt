@@ -1,0 +1,1 @@
+gunicorn guiding_app.main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 192.168.1.201:8080
