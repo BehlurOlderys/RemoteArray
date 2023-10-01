@@ -83,6 +83,10 @@ class ZwoCamera(AscomCamera):
             pass
         self._camera.set_image_type(asi.ASI_IMG_RAW16)
 
+    def get_last_image(self):
+        return True, self._buffer_size, self._buffer
+
+
     def get_setting(self, setting_name):
         allowed_settings = [
                 "gain",

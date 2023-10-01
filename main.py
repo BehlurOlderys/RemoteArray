@@ -1,6 +1,6 @@
 from typing import Union
 import time
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.responses import FileResponse
 
 from guiding_app.camera.zwo_camera import ZwoCamera
@@ -58,6 +58,11 @@ def demo_camera(camera_id: int):
 @app.get('/camera/{camera_id}/set_defaults')
 def set_camera_defaults(camera_id: int):
     camera.set_defaults()
+
+@app.get('/camera/{camera_id}/get_last_image')
+def get_last_image(camera_id: int):
+    is_ok, bytes_size, image_bytes = camera.get_last_image()
+    return Response(content=image_bytes, media_type="application/octet-stream")
 
 @app.get('/camera/{camera_id}/get_{setting}')
 def get_camera_gain(camera_id: int, setting: str):
