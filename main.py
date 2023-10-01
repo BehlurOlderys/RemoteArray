@@ -15,6 +15,8 @@ ZwoCamera.initialize_library()
 
 app = FastAPI()
 camera = None
+favicon_path = 'favicon.ico'
+
 
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
@@ -29,25 +31,30 @@ async def add_process_time_header(request: Request, call_next):
 def read_item(item_id: int, q: Union[str, None] = None):
     return {"item_id": item_id, "q": q}
 
-favicon_path = 'favicon.ico'
 
 @app.get('/favicon.ico')
 async def favicon():
     print('Hosting favicon...')
     return FileResponse(favicon_path)
 
+
 @app.get('/cameras_list')
 def cameras_list():
     return {"cameras": ZwoCamera.get_cameras_list()}
+
 
 @app.post('/init_camera')
 def init_camera(data: CameraName):
     global camera
     cameras_list = ZwoCamera.get_cameras_list()
     camera_index = cameras_list.index(data.name)
-    camera = ZwoCamera(camera_index)
-    print(f"Initialized camera {data.name} with index {camera_index}")
+    if camera is None:
+        camera = ZwoCamera(camera_index)
+        print(f"Initialized camera {data.name} with index {camera_index}")
+    else:
+        print(f"Camera {data.name} at index {camera_index} already initialized, nothing to do")
     return data
+
 
 @app.get('/camera/{camera_id}/demo')
 def demo_camera(camera_id: int):
@@ -55,14 +62,21 @@ def demo_camera(camera_id: int):
         return FileResponse("image_mono.jpg")
     return {"error": "capture failed!"}
 
+
 @app.get('/camera/{camera_id}/set_defaults')
 def set_camera_defaults(camera_id: int):
     camera.set_defaults()
 
+
 @app.get('/camera/{camera_id}/get_last_image')
 def get_last_image(camera_id: int):
-    is_ok, bytes_size, image_bytes = camera.get_last_image()
-    return Response(content=image_bytes, media_type="application/octet-stream")
+    r = camera.capture_to_buffer()
+    is_ok, image_bytes, bytes_size = camera.get_last_image()
+    by2 = bytes(image_bytes)
+    print(f"Capturing result: {r}. Responding with image_size={bytes_size}")
+    headers = {"x-image-mode" : camera.get_readoutmode_str()}
+    return Response(content=by2, headers=headers, media_type="application/octet-stream")
+
 
 @app.get('/camera/{camera_id}/get_{setting}')
 def get_camera_gain(camera_id: int, setting: str):

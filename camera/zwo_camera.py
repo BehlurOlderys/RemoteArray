@@ -47,12 +47,12 @@ class ZwoCamera(AscomCamera):
         self._state = CameraState.IDLE
         self._camera = asi.Camera(camera_index)
         self._index = camera_index
-        # self._camera.set_control_value(asi.ASI_HIGH_SPEED_MODE, 0)
-        # self._camera.set_control_value(asi.ASI_BANDWIDTHOVERLOAD, 40)
-        # self._camera.set_control_value(asi.ASI_GAIN, 17)
-        # self._camera.set_control_value(asi.ASI_EXPOSURE, 1 * ONE_SECOND_IN_MICROSECONDS)
-        # supported = self._camera.get_camera_property()['SupportedVideoFormat']
-        # self._camera.set_image_type(supported[0])
+        self._camera.set_control_value(asi.ASI_HIGH_SPEED_MODE, 0)
+        self._camera.set_control_value(asi.ASI_BANDWIDTHOVERLOAD, 40)
+        self._camera.set_control_value(asi.ASI_GAIN, 100)
+        self._camera.set_control_value(asi.ASI_EXPOSURE, 1 * ONE_SECOND_IN_MICROSECONDS)
+        supported = self._camera.get_camera_property()['SupportedVideoFormat']
+        self._camera.set_image_type(supported[0])
         self._connected = True
         self._new_filename = None
         self._last_duration = 1
@@ -63,7 +63,7 @@ class ZwoCamera(AscomCamera):
         self._buffer_size = 0
         self._reserve_buffer()
 
-    def set_defaults():
+    def set_defaults(self):
         self._camera.set_control_value(asi.ASI_HIGH_SPEED_MODE, 0)
         self._camera.set_control_value(asi.ASI_BANDWIDTHOVERLOAD, self._camera.get_controls()['BandWidth']['MinValue'])
         self._camera.disable_dark_subtract()
@@ -84,8 +84,7 @@ class ZwoCamera(AscomCamera):
         self._camera.set_image_type(asi.ASI_IMG_RAW16)
 
     def get_last_image(self):
-        return True, self._buffer_size, self._buffer
-
+        return True, *self._get_buffer()
 
     def get_setting(self, setting_name):
         allowed_settings = [
@@ -148,11 +147,18 @@ class ZwoCamera(AscomCamera):
     def get_exposure(self):
         return self._camera.get_control_value(asi.ASI_EXPOSURE)[0]
 
-
     def set_exposure(self, duration_s):
         duration_s = float(duration_s)
         self._camera.set_control_value(asi.ASI_EXPOSURE, int(duration_s * ONE_SECOND_IN_MICROSECONDS))
         self._last_duration = duration_s
+
+    def capture_to_buffer(self):
+        try:
+            self._camera.capture(buffer_=self._buffer)
+            return True
+        except asi.ZWO_CaptureError as ce:
+            print(f"error = {ce}, status = {ce.exposure_status}")
+            return False
 
     def capture(self, filename):
         try:
@@ -170,6 +176,8 @@ class ZwoCamera(AscomCamera):
         elif whbi[3] == asi.ASI_IMG_RAW16:
             sz *= 2
         self._log.info(f"Reserving buffer of size {whbi[0]}x{whbi[1]}={sz}")
+
+        print(f"Size of reserved buffer = {sz}")
 
         if self._buffer is None:
             self._buffer_size = sz
@@ -532,6 +540,10 @@ class ZwoCamera(AscomCamera):
         whbi[2] = new_bins
 
         self._camera.set_roi_format(*whbi)
+
+    def get_readoutmode_str(self):
+        it = self._camera.get_image_type()
+        return image_types_by_value[it]
 
     def set_readoutmode(self, value):
         value = int(value)
