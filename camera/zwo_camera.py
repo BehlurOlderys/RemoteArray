@@ -86,14 +86,29 @@ class ZwoCamera(AscomCamera):
     def get_last_image(self):
         return True, *self._get_buffer()
 
-    def get_setting(self, setting_name):
+    def get_setting(self, setting_name: str):
         allowed_settings = [
                 "gain",
                 "exposure",
-                "ccdtemperature"
+                "ccdtemperature",
+                "numx",
+                "numy",
+                "maxbinx",
+                "cooleron",
+                "cangetcoolerpower",
+                "coolerpower",
+                "readoutmode",
+                "readoutmodes"
         ]
         if setting_name in allowed_settings:
             return True, getattr(self, "get_"+setting_name)()
+        return False, {"allowed_settings": allowed_settings}
+
+    def set_setting(self, setting_name: str, value: str):
+        allowed_settings = ["binx"]
+        if setting_name == "binx":
+            self.set_binx(value)
+            return True, value
         return False, {"allowed_settings": allowed_settings}
 
     def demo(self):
@@ -531,13 +546,16 @@ class ZwoCamera(AscomCamera):
     def _set_bins(self, value):
         whbi = self._camera.get_roi_format()
         new_bins = int(value)
-        if new_bins < 0 or new_bins > max(self._camera.get_camera_property()["SupportedBins"]):
+        supported = self._camera.get_camera_property()["SupportedBins"]
+        print(f"Supported bins = {supported}")
+        if new_bins < 0 or new_bins > max(supported):
             raise Exception
 
         old_bins = whbi[2]
-        whbi[0] = int(whbi[0]*old_bins/new_bins)
-        whbi[1] = int(whbi[1]*old_bins/new_bins)
+        whbi[0] = 2*int(whbi[0]*old_bins / new_bins / 2)
+        whbi[1] = 2*int(whbi[1]*old_bins / new_bins / 2)
         whbi[2] = new_bins
+        print(f"Trying to set new res: {whbi}")
 
         self._camera.set_roi_format(*whbi)
 
