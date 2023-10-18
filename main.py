@@ -10,6 +10,7 @@ from pydantic import BaseModel
 class CameraSetting(BaseModel):
     value: str
 
+
 ZwoCamera.initialize_library()
 
 app = FastAPI()
