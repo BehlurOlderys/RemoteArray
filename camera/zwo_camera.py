@@ -97,7 +97,7 @@ class ZwoCamera(AscomCamera):
                 "cooleron",
                 "cangetcoolerpower",
                 "coolerpower",
-                "readoutmode",
+                "readoutmode_str",
                 "readoutmodes"
         ]
         if setting_name in allowed_settings:
@@ -105,9 +105,12 @@ class ZwoCamera(AscomCamera):
         return False, {"allowed_settings": allowed_settings}
 
     def set_setting(self, setting_name: str, value: str):
-        allowed_settings = ["binx"]
+        allowed_settings = ["binx", "readoutmode_str"]
         if setting_name == "binx":
             self.set_binx(value)
+            return True, value
+        if setting_name == "readoutmode_str":
+            self.set_readoutmode_str(value)
             return True, value
         return False, {"allowed_settings": allowed_settings}
 
@@ -522,6 +525,10 @@ class ZwoCamera(AscomCamera):
         mode = self._camera.get_image_type()
         return sorted_supported.index(mode)
 
+    def get_readoutmode_str(self):
+        mode = self._camera.get_image_type()
+        return image_types_by_value.get(mode, "<FAIL>")
+
     def get_readoutmodes(self):
         camera_info = self._camera.get_camera_property()
         supported = camera_info['SupportedVideoFormat']
@@ -562,6 +569,10 @@ class ZwoCamera(AscomCamera):
     def get_readoutmode_str(self):
         it = self._camera.get_image_type()
         return image_types_by_value[it]
+
+    def set_readoutmode_str(self, value):
+        self._camera.set_image_type(image_types_by_name[value])
+        self._reserve_buffer()
 
     def set_readoutmode(self, value):
         value = int(value)
