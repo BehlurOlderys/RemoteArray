@@ -59,6 +59,7 @@ class ZwoCamera(AscomCamera):
         print(f"ROI FORMAT = {self._camera.get_roi_format()}")
         self._log.info(f"ROI FORMAT = {self._camera.get_roi_format()}")
 
+        self._capturing = False
         self._buffer = None
         self._buffer_size = 0
         self._reserve_buffer()
@@ -91,27 +92,38 @@ class ZwoCamera(AscomCamera):
                 "gain",
                 "exposure",
                 "ccdtemperature",
+                "cansetccdtemperature",
+                "setccdtemperature",
                 "numx",
                 "numy",
                 "maxbinx",
                 "cooleron",
                 "cangetcoolerpower",
                 "coolerpower",
+                "offset",
+                "offsetmin",
+                "offsetmax",
                 "readoutmode_str",
-                "readoutmodes"
+                "readoutmodes",
+                "imageready",
+                "iscapturing"
         ]
         if setting_name in allowed_settings:
             return True, getattr(self, "get_"+setting_name)()
         return False, {"allowed_settings": allowed_settings}
 
     def set_setting(self, setting_name: str, value: str):
-        allowed_settings = ["binx", "readoutmode_str"]
-        if setting_name == "binx":
-            self.set_binx(value)
-            return True, value
-        if setting_name == "readoutmode_str":
-            self.set_readoutmode_str(value)
-            return True, value
+        allowed_settings = [
+            "binx",
+            "readoutmode_str",
+            "exposure",
+            "gain",
+            "offset",
+            "setccdtemperature",
+            "capturing"
+        ]
+        if setting_name in allowed_settings:
+            return True, getattr(self, "set_"+setting_name)(value)
         return False, {"allowed_settings": allowed_settings}
 
     def demo(self):
@@ -351,8 +363,12 @@ class ZwoCamera(AscomCamera):
         return float(self._camera.get_control_value(asi.ASI_TEMPERATURE)[0]) / 10.0
 
     def set_gain(self, value):
-        value = int(value)
-        self._camera.set_control_value(asi.ASI_GAIN, value)
+        gain = int(value)
+        self._camera.set_control_value(asi.ASI_GAIN, gain)
+        
+    def set_offset(self, value):
+        offset = int(value)
+        self._camera.set_control_value(asi.ASI_OFFSET, offset)
 
     def get_bayeroffsetx(self):
         return 0  # TODO!
@@ -479,6 +495,12 @@ class ZwoCamera(AscomCamera):
     def get_imageready(self):
         return self._camera.get_exposure_status() == 2
 
+    def get_iscapturing(self):
+        return self._capturing
+
+    def set_capturing(self, value):
+        self._capturing = bool(value)
+
     def get_ispulseguiding(self):
         pass  # TODO!
 
@@ -504,13 +526,13 @@ class ZwoCamera(AscomCamera):
         return self._camera.get_roi_format()[1]
 
     def get_offset(self):
-        pass  # TODO!
+        return self._camera.get_control_value(asi.ASI_OFFSET)[0]
 
     def get_offsetmax(self):
-        pass  # TODO!
+        return self._camera.get_controls()["Gain"]["MaxValue"]
 
     def get_offsetmin(self):
-        pass  # TODO!
+        return self._camera.get_controls()["Gain"]["MinValue"]
 
     def get_offsets(self):
         pass  # TODO!
@@ -542,7 +564,11 @@ class ZwoCamera(AscomCamera):
         return 2  # TODO!!!! it should be variable, this is good only for ASI120MC
 
     def get_setccdtemperature(self):
-        pass  # TODO!
+        return self._camera.get_control_value(asi.ASI_TARGET_TEMP)[0]
+
+    def set_setccdtemperature(self, value):
+        degrees = int(value)
+        self._camera.set_control_value(asi.ASI_TARGET_TEMP, degrees)
 
     def get_startx(self):
         return self._camera.get_roi()[0]
