@@ -7,6 +7,7 @@ from PIL import Image
 from guiding_app.app_utils import add_log
 from enum import IntEnum
 from threading import Event, Timer
+import io
 
 
 if os.name == "nt": 
@@ -18,13 +19,6 @@ asi_initialized = False
 ONE_SECOND_IN_MILLISECONDS = 1000
 ONE_MILLISECOND_IN_MICROSECONDS = 1000
 ONE_SECOND_IN_MICROSECONDS = ONE_SECOND_IN_MILLISECONDS * ONE_MILLISECOND_IN_MICROSECONDS
-
-
-def one_second_capture(parent, stop_event: Event):
-    parent._state_counters[parent._state] += 1
-    if not stop_event.is_set():
-        # call f() again in 60 seconds
-        Timer(1, one_second_capture, [parent, stop_event]).start()
 
 
 exp_states = {
@@ -40,6 +34,27 @@ class CameraCaptureStatus(IntEnum):
     ONLY_CAPTURE = 2
     CAPTURE_AND_SAVE = 3
     ERROR = 9
+
+
+def one_second_capture(parent, stop_event: Event):
+    camera_state: CameraCaptureStatus = parent.get_status_enum()
+    print(f"Camera capture status = {camera_state}")
+    if camera_state == CameraCaptureStatus.ONLY_CAPTURE:
+        exp_status = parent.get_exposure_status()
+        if exp_status == asi.ASI_EXP_IDLE:
+            print("Starting new exposure (from IDLE)")
+            parent.startexposure()
+        elif exp_status == asi.ASI_EXP_SUCCESS:
+            print("Starting new exposure (from SUCCESS)")
+            parent.get_imagebytes()
+            parent.startexposure()
+        else:
+            print(f"Strange: status = {exp_status}")
+
+    parent._state_counters[parent._state] += 1
+    if not stop_event.is_set():
+        # call f() again in 60 seconds
+        Timer(1, one_second_capture, [parent, stop_event]).start()
 
 
 image_types_by_name = {
@@ -118,6 +133,32 @@ class ZwoCamera(AscomCamera):
     def get_last_image(self):
         return True, *self._get_buffer()
 
+    def get_buffer_as_jpg(self):
+        data, bsize = self._get_buffer()
+        whbi = self._camera.get_roi_format()
+        shape = [whbi[1], whbi[0]]
+        if whbi[3] == asi.ASI_IMG_RAW8 or whbi[3] == asi.ASI_IMG_Y8:
+            img = np.frombuffer(data, dtype=np.uint8)
+        elif whbi[3] == asi.ASI_IMG_RAW16:
+            img = np.frombuffer(data, dtype=np.uint16)
+        elif whbi[3] == asi.ASI_IMG_RGB24:
+            img = np.frombuffer(data, dtype=np.uint8)
+            shape.append(3)
+        else:
+            raise ValueError('Unsupported image type')
+        img = img.reshape(shape)
+
+        mode = None
+        if len(img.shape) == 3:
+            img = img[:, :, ::-1]  # Convert BGR to RGB
+        if whbi[3] == asi.ASI_IMG_RAW16:
+            mode = 'I;16'
+        pil_image = Image.fromarray(img, mode=mode)
+        img_bytes = io.BytesIO()
+        pil_image.point(lambda i: i * (1. / 256)).convert('L').save(img_bytes, format='JPEG', quality=85)  # Save image to BytesIO
+        img_bytes.seek(0)
+        return img_bytes
+
     def get_setting(self, setting_name: str):
         allowed_settings = [
                 "gain",
@@ -153,7 +194,8 @@ class ZwoCamera(AscomCamera):
             "gain",
             "offset",
             "setccdtemperature",
-            "capturing"
+            "capturing",
+            "status"
         ]
         if setting_name in allowed_settings:
             return True, getattr(self, "set_"+setting_name)(value)
@@ -211,8 +253,12 @@ class ZwoCamera(AscomCamera):
         return {
             "temperature": self.get_ccdtemperature(),
             "capture_status": self.get_status(),
+            "exposure_status": self.get_exposure_status(),
             "counters": self._state_counters
         }
+
+    def get_status_enum(self):
+        return self._state
 
     def get_status(self):
         if self._state == CameraCaptureStatus.IDLE:
@@ -224,6 +270,7 @@ class ZwoCamera(AscomCamera):
         return "ERROR_STATE"
 
     def set_status(self, value):
+        print(f"Setting status to {value}")
         if value == "IDLE":
             self._state = CameraCaptureStatus.IDLE
         elif value == "CAPTURE":
@@ -434,7 +481,10 @@ class ZwoCamera(AscomCamera):
     def get_bayeroffsety(self):
         return 0  # TODO!
 
-    def get_camerastate(self):
+    def get_exposure_status(self):
+        return self._camera.get_exposure_status()
+
+    def get_capturestate(self):
         exp_status = self._camera.get_exposure_status()
         if exp_status == 2:
             return CameraState.IDLE
@@ -511,6 +561,9 @@ class ZwoCamera(AscomCamera):
 
     def get_heatsinktemperature(self):
         return 0  # TODO!!!
+
+    def get_camerastate(self):
+        return self.get_capturestate()
 
     def get_imagearray(self):
         filename = self._new_filename  # TODO this can be somehow customized
@@ -712,11 +765,5 @@ class ZwoCamera(AscomCamera):
     def stoptexposure(self):
         self._camera.stop_exposure()
 
-    def startexposure(self, duration, light=True, save=False):
-        duration = float(duration)
-        exposure_us = int(duration * ONE_SECOND_IN_MICROSECONDS)
-        self._log.info(f"Starting exposure: {exposure_us}us")
-        if self._last_duration != duration:
-            self._last_duration = duration
-            self._camera.set_control_value(asi.ASI_EXPOSURE, exposure_us)
-        self._camera.start_exposure(is_dark=not light)
+    def startexposure(self):
+        self._camera.start_exposure(is_dark=False)

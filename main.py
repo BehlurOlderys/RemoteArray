@@ -4,6 +4,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import FileResponse
 
 from guiding_app.camera.zwo_camera import ZwoCamera
+from PIL import Image
 from pydantic import BaseModel
 
 
@@ -17,6 +18,14 @@ app = FastAPI()
 camera = None
 favicon_path = '/home/pi/workspace/samyang_app/guiding_app/favicon.ico'
 cameras = {}
+
+
+@app.on_event("shutdown")
+def shutdown_event():
+    for camera in cameras.values():
+        if camera is not None:
+            camera.__del__()
+            print("Camera shut down!")
 
 
 @app.middleware("http")
@@ -61,14 +70,20 @@ def set_camera_defaults(camera_id: int):
 
 
 @app.get('/camera/{camera_id}/get_last_image')
-def get_last_image(camera_id: int):
+def get_last_image(camera_id: int, format: str="jpg"):
     camera = cameras[camera_id]
-    r = camera.capture_to_buffer()
+
     is_ok, image_bytes, bytes_size = camera.get_last_image()
-    by2 = bytes(image_bytes)
-    print(f"Capturing result: {r}. Responding with image_size={bytes_size}")
-    headers = {"x-image-mode": camera.get_readoutmode_str()}
-    return Response(content=by2, headers=headers, media_type="application/octet-stream")
+    if format == "raw":
+        by2 = bytes(image_bytes)
+        print(f"Capturing result: {is_ok}. Responding with image_size={bytes_size}")
+        headers = {"x-image-mode": camera.get_readoutmode_str()}
+        return Response(content=by2, headers=headers, media_type="application/octet-stream")
+    elif format == "jpg":
+        print("Trying to send jpeg!")
+        image = camera.get_buffer_as_jpg()
+
+    return Response(content=image.getvalue(), media_type="image/jpeg")
 
 
 @app.get('/camera/{camera_id}/get_{setting}')
