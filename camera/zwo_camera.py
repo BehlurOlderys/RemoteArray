@@ -5,6 +5,7 @@ import base64
 import os
 from PIL import Image
 from guiding_app.app_utils import add_log
+from enum import IntEnum
 
 
 if os.name == "nt": 
@@ -25,6 +26,13 @@ exp_states = {
     asi.ASI_EXP_WORKING: "Working"
 }
 
+
+class CameraCaptureStatus(IntEnum):
+    IDLE = 1
+    ONLY_CAPTURE = 2
+    CAPTURE_AND_SAVE = 3
+
+
 image_types_by_name = {
     "RAW8": asi.ASI_IMG_RAW8,
     "RGB24": asi.ASI_IMG_RGB24,
@@ -44,7 +52,8 @@ class ZwoCamera(AscomCamera):
             logs[camera_index] = add_log(f"camera_{camera_index}")
 
         self._log = logs[camera_index]
-        self._state = CameraState.IDLE
+        self._state = CameraCaptureStatus.IDLE
+
         self._camera = asi.Camera(camera_index)
         self._index = camera_index
         self._camera.set_control_value(asi.ASI_HIGH_SPEED_MODE, 0)
@@ -106,7 +115,9 @@ class ZwoCamera(AscomCamera):
                 "readoutmode_str",
                 "readoutmodes",
                 "imageready",
-                "iscapturing"
+                "iscapturing",
+                "tempandstatus",
+                "status"
         ]
         if setting_name in allowed_settings:
             return True, getattr(self, "get_"+setting_name)()
@@ -173,6 +184,30 @@ class ZwoCamera(AscomCamera):
         except asi.ZWO_CaptureError as ce:
             print(f"error = {ce}, status = {ce.exposure_status}")
             return False
+
+    def get_tempandstatus(self):
+        return {
+            "temperature": self.get_ccdtemperature(),
+            "capture_status": self.get_status(),
+        }
+
+    def get_status(self):
+        if self._state == CameraCaptureStatus.IDLE:
+            return "IDLE"
+        elif self._state == CameraCaptureStatus.ONLY_CAPTURE:
+            return "CAPTURE"
+        elif self._state == CameraCaptureStatus.CAPTURE_AND_SAVE:
+            return "SAVE"
+        return "ERROR_STATE"
+
+    def set_status(self, value):
+        if value == "IDLE":
+            self._state = CameraCaptureStatus.IDLE
+        elif value == "CAPTURE":
+            self._state = CameraCaptureStatus.ONLY_CAPTURE
+        elif value == "SAVE":
+            self._state = CameraCaptureStatus.CAPTURE_AND_SAVE
+        return value
 
     def get_exposure(self):
         return self._camera.get_control_value(asi.ASI_EXPOSURE)[0]

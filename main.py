@@ -86,7 +86,7 @@ def set_camera_setting(camera_id: int, setting: str, data: CameraSetting):
     camera = cameras[camera_id]
     is_success, output = camera.set_setting(setting, value)
     if is_success:
-        return {"value": output}
+        return {"value": value}
     return {"error": output}
 
 
