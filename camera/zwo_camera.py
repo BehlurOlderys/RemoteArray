@@ -6,6 +6,7 @@ import os
 from PIL import Image
 from guiding_app.app_utils import add_log
 from enum import IntEnum
+from threading import Event, Timer
 
 
 if os.name == "nt": 
@@ -17,6 +18,13 @@ asi_initialized = False
 ONE_SECOND_IN_MILLISECONDS = 1000
 ONE_MILLISECOND_IN_MICROSECONDS = 1000
 ONE_SECOND_IN_MICROSECONDS = ONE_SECOND_IN_MILLISECONDS * ONE_MILLISECOND_IN_MICROSECONDS
+
+
+def one_second_capture(parent, stop_event: Event):
+    parent._state_counters[parent._state] += 1
+    if not stop_event.is_set():
+        # call f() again in 60 seconds
+        Timer(1, one_second_capture, [parent, stop_event]).start()
 
 
 exp_states = {
@@ -31,6 +39,7 @@ class CameraCaptureStatus(IntEnum):
     IDLE = 1
     ONLY_CAPTURE = 2
     CAPTURE_AND_SAVE = 3
+    ERROR = 9
 
 
 image_types_by_name = {
@@ -54,6 +63,16 @@ class ZwoCamera(AscomCamera):
         self._log = logs[camera_index]
         self._state = CameraCaptureStatus.IDLE
 
+        self._state_counters = {
+            CameraCaptureStatus.IDLE: 0,
+            CameraCaptureStatus.ONLY_CAPTURE: 0,
+            CameraCaptureStatus.CAPTURE_AND_SAVE: 0,
+            CameraCaptureStatus.ERROR: 0
+        }
+
+        self._loop_event = Event()
+        one_second_capture(self, self._loop_event)
+
         self._camera = asi.Camera(camera_index)
         self._index = camera_index
         self._camera.set_control_value(asi.ASI_HIGH_SPEED_MODE, 0)
@@ -72,6 +91,9 @@ class ZwoCamera(AscomCamera):
         self._buffer = None
         self._buffer_size = 0
         self._reserve_buffer()
+
+    def __del__(self):
+        self._loop_event.set()
 
     def set_defaults(self):
         self._camera.set_control_value(asi.ASI_HIGH_SPEED_MODE, 0)
@@ -189,6 +211,7 @@ class ZwoCamera(AscomCamera):
         return {
             "temperature": self.get_ccdtemperature(),
             "capture_status": self.get_status(),
+            "counters": self._state_counters
         }
 
     def get_status(self):
