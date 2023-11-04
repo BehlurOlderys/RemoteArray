@@ -161,10 +161,12 @@ class ZwoCamera(AscomCamera):
 
     def get_setting(self, setting_name: str):
         allowed_settings = [
-                "binx"
+                "binx",
                 "gain",
                 "exposure",
                 "cansetccdtemperature",
+                "cansetcooleron",
+                "cangetcoolerpower",
                 "ccdtemperature",
                 "controls",
                 "properties",
@@ -173,15 +175,16 @@ class ZwoCamera(AscomCamera):
                 "numy",
                 "maxbinx",
                 "cooleron",
-                "cangetcoolerpower",
                 "coolerpower",
                 "offset",
                 "offsetmin",
                 "offsetmax",
                 "readoutmode_str",
                 "readoutmodes",
+                "fastreadout",
                 "imageready",
                 "iscapturing",
+                "iscooled",
                 "tempandstatus",
                 "status"
         ]
@@ -204,6 +207,9 @@ class ZwoCamera(AscomCamera):
         if setting_name in allowed_settings:
             return True, getattr(self, "set_"+setting_name)(value)
         return False, {"allowed_settings": allowed_settings}
+
+    def get_cansetcooleron(self):
+        return self._camera.get_controls()["CoolerOn"]["IsWritable"]
 
     def demo(self):
         camera_info = self._camera.get_camera_property()
@@ -462,6 +468,9 @@ class ZwoCamera(AscomCamera):
     def get_cameraysize(self):
         return self._camera.get_camera_property()["MaxHeight"]
 
+    def get_iscooled(self):
+        return self._camera.get_camera_property()["IsCoolerCam"]
+
     def get_canasymmetricbin(self):
         return False
 
@@ -519,19 +528,18 @@ class ZwoCamera(AscomCamera):
         return False  # TODO - maybe?
 
     def get_cangetcoolerpower(self):
+        if "CoolPowerPerc" in self._camera.get_controls():
+            return True
         return False
 
     def get_cansetccdtemperature(self):
-        return self._camera.get_camera_property()["IsCoolerCam"]
+        return self._camera.get_controls()["TargetTemp"]["IsWritable"]
 
     def get_canstopexposure(self):
         return False  # TODO! Maybe it can be done
 
-    def get_cooleron(self):
-        return False
-
     def get_coolerpower(self):
-        pass  # TODO!
+        return self._camera.get_control_value(asi.ASI_COOLER_POWER_PERC)[0]
 
     def get_electronsperadu(self):
         pass  # TODO!
@@ -688,8 +696,13 @@ class ZwoCamera(AscomCamera):
         degrees = int(value)
         self._camera.set_control_value(asi.ASI_TARGET_TEMP, degrees)
 
+    def get_cooleron(self):
+        return self._camera.get_control_value(asi.ASI_COOLER_ON)[0]
+
     def set_cooleron(self, value):
-        pass
+        print(f"Set cooler on: {value}")
+        value_bool = (1 if value == "True" else 0)
+        self._camera.set_control_value(asi.ASI_COOLER_ON, value_bool)
 
     def get_startx(self):
         return self._camera.get_roi()[0]
