@@ -161,10 +161,12 @@ class ZwoCamera(AscomCamera):
 
     def get_setting(self, setting_name: str):
         allowed_settings = [
+                "binx"
                 "gain",
                 "exposure",
-                "ccdtemperature",
                 "cansetccdtemperature",
+                "ccdtemperature",
+                "controls",
                 "setccdtemperature",
                 "numx",
                 "numy",
@@ -194,6 +196,7 @@ class ZwoCamera(AscomCamera):
             "gain",
             "offset",
             "setccdtemperature",
+            "cooleron",
             "capturing",
             "status"
         ]
@@ -680,6 +683,9 @@ class ZwoCamera(AscomCamera):
     def set_setccdtemperature(self, value):
         degrees = int(value)
         self._camera.set_control_value(asi.ASI_TARGET_TEMP, degrees)
+
+    def set_cooleron(self, value):
+        pass
 
     def get_startx(self):
         return self._camera.get_roi()[0]
