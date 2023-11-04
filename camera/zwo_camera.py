@@ -167,6 +167,7 @@ class ZwoCamera(AscomCamera):
                 "cansetccdtemperature",
                 "ccdtemperature",
                 "controls",
+                "properties",
                 "setccdtemperature",
                 "numx",
                 "numy",
@@ -417,6 +418,9 @@ class ZwoCamera(AscomCamera):
 
     def get_name(self):
         return self._camera.get_camera_property()["Name"]
+
+    def get_properties(self):
+        return self._camera.get_camera_property()
 
     def get_description(self):
         if "Description" in self._camera.get_camera_property():
