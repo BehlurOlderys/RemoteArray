@@ -69,6 +69,26 @@ def set_camera_defaults(camera_id: int):
     cameras[camera_id].set_defaults()
 
 
+@app.post('/camera/{camera_id}/start_capturing')
+def start_capturing(camera_id: int):
+    cameras[camera_id].start_capturing()
+
+
+@app.post('/camera/{camera_id}/stop_capturing')
+def stop_capturing(camera_id: int):
+    cameras[camera_id].stop_capturing()
+
+
+@app.post('/camera/{camera_id}/start_saving')
+def start_saving(camera_id: int):
+    cameras[camera_id].start_saving("default")
+
+
+@app.post('/camera/{camera_id}/stop_saving')
+def stop_saving(camera_id: int):
+    cameras[camera_id].stop_saving()
+
+
 @app.get('/camera/{camera_id}/get_last_image')
 def get_last_image(camera_id: int, format: str="jpg"):
     camera = cameras[camera_id]

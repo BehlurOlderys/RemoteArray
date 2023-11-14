@@ -110,6 +110,18 @@ class ZwoCamera(AscomCamera):
     def __del__(self):
         self._loop_event.set()
 
+    def start_capturing(self):
+        pass
+
+    def stop_capturing(self):
+        pass
+
+    def start_saving(self, dir_name):
+        pass
+
+    def stop_saving(self):
+        pass
+
     def set_defaults(self):
         self._camera.set_control_value(asi.ASI_HIGH_SPEED_MODE, 0)
         self._camera.set_control_value(asi.ASI_BANDWIDTHOVERLOAD, self._camera.get_controls()['BandWidth']['MinValue'])
