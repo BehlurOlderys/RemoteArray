@@ -12,6 +12,12 @@ class CameraSetting(BaseModel):
     value: str
 
 
+class CaptureParams(BaseModel):
+    dir_name: str
+    number: int
+    prefix: str
+
+
 ZwoCamera.initialize_library()
 
 app = FastAPI()
@@ -80,8 +86,9 @@ def stop_capturing(camera_id: int):
 
 
 @app.post('/camera/{camera_id}/start_saving')
-def start_saving(camera_id: int):
-    cameras[camera_id].start_saving("default")
+def start_saving(camera_id: int, data: CaptureParams):
+    print(f"Start saving with data: {data}")
+    cameras[camera_id].start_saving(data.dir_name, data.number, data.prefix)
 
 
 @app.post('/camera/{camera_id}/stop_saving')

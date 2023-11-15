@@ -8,6 +8,7 @@ from guiding_app.app_utils import add_log
 from enum import IntEnum
 from threading import Event, Timer
 import io
+from guiding_app.interval_utils import start_interval_polling
 
 
 if os.name == "nt": 
@@ -53,7 +54,6 @@ def one_second_capture(parent, stop_event: Event):
 
     parent._state_counters[parent._state] += 1
     if not stop_event.is_set():
-        # call f() again in 60 seconds
         Timer(1, one_second_capture, [parent, stop_event]).start()
 
 
@@ -86,8 +86,6 @@ class ZwoCamera(AscomCamera):
         }
 
         self._loop_event = Event()
-        one_second_capture(self, self._loop_event)
-
         self._camera = asi.Camera(camera_index)
         self._index = camera_index
         self._camera.set_control_value(asi.ASI_HIGH_SPEED_MODE, 0)
@@ -101,6 +99,10 @@ class ZwoCamera(AscomCamera):
         self._last_duration = 1
         print(f"ROI FORMAT = {self._camera.get_roi_format()}")
         self._log.info(f"ROI FORMAT = {self._camera.get_roi_format()}")
+        self._capture_directory = "Capture"
+        self._max_captures = 1
+        self._current_capture_number = 0
+        self._image_prefix = "image"
 
         self._capturing = False
         self._buffer = None
@@ -110,16 +112,78 @@ class ZwoCamera(AscomCamera):
     def __del__(self):
         self._loop_event.set()
 
+    def _capturing_loop(self):
+        camera_state: CameraCaptureStatus = self._state
+        print(f"Camera capture status = {camera_state}")
+        if camera_state == CameraCaptureStatus.ONLY_CAPTURE or camera_state == CameraCaptureStatus.CAPTURE_AND_SAVE:
+            exp_status = self.get_exposure_status()
+            print(f"Camera exp status = {exp_status}")
+            if exp_status == asi.ASI_EXP_IDLE:
+                print("Starting new exposure (from IDLE)")
+                self.startexposure()
+            elif exp_status == asi.ASI_EXP_SUCCESS:
+                print("Starting new exposure (from SUCCESS)")
+                self.get_imagebytes()
+                if camera_state == CameraCaptureStatus.CAPTURE_AND_SAVE:
+                    filename = os.path.join(
+                        self._capture_directory,
+                        f"{self._image_prefix}_{self._current_capture_number:05d}.tif"
+                    )
+                    self._current_capture_number += 1
+                    print(f"Saving to {filename}")
+                    self._save_imagebytes_to_file(filename)
+                    if self._current_capture_number >= self._max_captures:
+                        print(f"Saving {self._max_captures} images completed!")
+                        self._stop_saving_impl()
+                        return
+                    print(f"Starting exposure number {self._current_capture_number}")
+                self.startexposure()
+            elif exp_status == asi.ASI_EXP_WORKING:
+                print("Camera is working, wait another 1s...")
+            else:
+                print(f"Strange: status = {exp_status}")
+
+        self._state_counters[self._state] += 1
+
     def start_capturing(self):
+        self._loop_event.clear()
+        self._state = CameraCaptureStatus.ONLY_CAPTURE
+        start_interval_polling(self._loop_event, self._capturing_loop, 1, None)
         pass
 
     def stop_capturing(self):
+        self._stop_saving_impl()
+        self._loop_event.set()
+        self._state = CameraCaptureStatus.IDLE
         pass
 
-    def start_saving(self, dir_name):
+    def start_saving(self, dir_name, number, prefix):
+        self._capture_directory = dir_name
+        self._max_captures = number
+        self._image_prefix = prefix
+        self._current_capture_number = 0
+        self._state = CameraCaptureStatus.CAPTURE_AND_SAVE
         pass
 
     def stop_saving(self):
+        print("Stopping saving!")
+        self._stop_saving_impl()
+
+    def _stop_saving_impl(self):
+        self._state = CameraCaptureStatus.ONLY_CAPTURE
+        self._max_captures = 1
+        self._current_capture_number = 0
+
+    def _save_imagebytes_to_file(self, filename):
+        # from PIL import Image
+        # mode = None
+        # if len(img.shape) == 3:
+        #     img = img[:, :, ::-1]  # Convert BGR to RGB
+        # if whbi[3] == ASI_IMG_RAW16:
+        #     mode = 'I;16'
+        # image = Image.fromarray(img, mode=mode)
+        # image.save(filename)
+        # logger.debug('wrote %s', filename)
         pass
 
     def set_defaults(self):
