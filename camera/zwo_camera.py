@@ -348,12 +348,12 @@ class ZwoCamera(AscomCamera):
 
     def get_status(self):
         if self._state == CameraCaptureStatus.IDLE:
-            return "IDLE"
+            return  {"state": "IDLE", "number": 0}
         elif self._state == CameraCaptureStatus.ONLY_CAPTURE:
-            return "CAPTURE"
+            return  {"state": "CAPTURE", "number": 0}
         elif self._state == CameraCaptureStatus.CAPTURE_AND_SAVE:
-            return "SAVE"
-        return "ERROR_STATE"
+            return {"state": "SAVE", "number": self._current_capture_number}
+        return {"state": "ERROR", "number": 0}
 
     def set_status(self, value):
         print(f"Setting status to {value}")
